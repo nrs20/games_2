@@ -9,12 +9,11 @@
 
     <h1>My Favorites</h1>
     {% if favorites %}
-        {% for game in favorites %}
+        {% for game in favorites | unique(attribute='Name') %}
             <div>
                 <h3>{{ game['Name'] }}</h3>
                 <p>Genre: {{ game['Genre'] }}</p>
                 <p>User Score: {{ game['User_Score'] }}</p>
-                <p>Platform: {{ game['Platform']|join(", ") }}</p>  <!-- Join the platforms to display them as a comma-separated list -->
                 <form action="{{ url_for('remove_from_favorites') }}" method="post">
                     <input type="hidden" name="game_name" value="{{ game['Name'] }}">
                     <button type="submit">Remove from Favorites</button>
