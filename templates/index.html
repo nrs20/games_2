@@ -2,21 +2,18 @@
 <html>
 <head>
     <title>Game Recommender</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
+
 </head>
 <body>
     <h1>Game Recommender</h1>
-
-    <!-- Display welcome message if user is logged in -->
-    {% if 'user_id' in session %}
-    <p>Welcome, {{ current_user.user_id }}!</p>
+    {% if 'loggedin' in session %}
+    <p>Welcome, {{ session['name'] }}!</p>
     <a href="{{ url_for('logout') }}">Logout</a>
-{% else %}
-    <p>Welcome, Guest!</p>
-    <a href="{{ url_for('register') }}">Register</a> |
+    <a href="{{ url_for('favorites') }}">My Favorites</a>
+    {% else %}
     <a href="{{ url_for('login') }}">Login</a>
-{% endif %}
-
-
+    {% endif %}
     <form method="post" action="/recommend">
         <label for="genre">Genre:</label>
         <select name="genre" id="genre">
@@ -29,6 +26,7 @@
             <option value="Racing">Racing</option>
             <option value="Shooter">Shooter</option>
             <option value="Simulation">Simulation</option>
+
             <!-- Add more genre options as needed -->
         </select>
         <br>
@@ -55,7 +53,13 @@
         <label for="user_score">User Score Threshold:</label>
         <input type="number" name="user_score" id="user_score" min="0" max="100" step="0.1" placeholder="Enter the minimum user score">
         <br>
+
+        <!-- Hidden input field for selected platform -->
+        <input type="hidden" name="selected_platform" id="selected_platform" value="">
+
         <button type="submit">Recommend</button>
     </form>
+
+    <!-- Your other HTML content -->
 </body>
 </html>
