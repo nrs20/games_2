@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game Recommender</title>
+</head>
+<body>
+    <h1>Game Recommender</h1>
+
+    <!-- Display welcome message if user is logged in -->
+    {% if 'user_id' in session %}
+    <p>Welcome, {{ current_user.user_id }}!</p>
+    <a href="{{ url_for('logout') }}">Logout</a>
+{% else %}
+    <p>Welcome, Guest!</p>
+    <a href="{{ url_for('register') }}">Register</a> |
+    <a href="{{ url_for('login') }}">Login</a>
+{% endif %}
+
+
+    <form method="post" action="/recommend">
+        <label for="genre">Genre:</label>
+        <select name="genre" id="genre">
+            <option value="Action">Action</option>
+            <option value="Adventure">Adventure</option>
+            <option value="Puzzle">Puzzle</option>
+            <option value="Role-Playing">Role-Playing</option>
+            <option value="Misc">Misc</option>
+            <option value="Sports">Sports</option>
+            <option value="Racing">Racing</option>
+            <option value="Shooter">Shooter</option>
+            <option value="Simulation">Simulation</option>
+            <!-- Add more genre options as needed -->
+        </select>
+        <br>
+        <label for="platform">Platform:</label>
+        <select name="platform" id="platform">
+            <option value="PC">PC</option>
+            <option value="PS">PS</option>
+            <option value="PSP">PSP</option>
+            <option value="PS2">PS2</option>
+            <option value="PS3">PS3</option>
+            <option value="PS4">PS4</option>
+            <option value="X360">X360</option>
+            <option value="XONE">XONE</option>
+            <option value="Wii">Wii</option>
+            <option value="WiiU">WiiU</option>
+            <option value="GB">GB</option>
+            <option value="SNES">SNES</option>
+            <option value="N64">N64</option>
+            <option value="DS">DS</option>
+            <!-- Add more platform options as needed -->
+        </select>
+        <br>
+        <br>
+        <label for="user_score">User Score Threshold:</label>
+        <input type="number" name="user_score" id="user_score" min="0" max="100" step="0.1" placeholder="Enter the minimum user score">
+        <br>
+        <button type="submit">Recommend</button>
+    </form>
+</body>
+</html>

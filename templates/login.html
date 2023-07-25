@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <!-- Add any necessary CSS styles or links to CSS files here -->
+</head>
+<body>
+    <h1>Login</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    {% if not current_user.is_authenticated %}
+        <!-- Display the login form if the user is not logged in -->
+        <form method="POST" action="{{ url_for('login') }}">
+            {{ form.csrf_token }}
+            <div>
+                {{ form.username.label }} {{ form.username() }}
+            </div>
+            <div>
+                {{ form.password.label }} {{ form.password() }}
+            </div>
+            <div>
+                {{ form.submit() }}
+            </div>
+        </form>
+    {% else %}
+        <!-- If user is already logged in, display a welcome message or any other content -->
+        <p>Welcome, {{ current_user.username }}! You are already logged in.</p>
+        <!-- You can add a link to the homepage, for example -->
+        <a href="{{ url_for('index') }}">Go to Homepage</a>
+    {% endif %}
+
+    <!-- Add any necessary JavaScript scripts or links to JS files here -->
+</body>
+</html>

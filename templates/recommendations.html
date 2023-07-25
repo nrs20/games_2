@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recommended Games</title>
+</head>
+<body>
+    <h1>Recommended Games</h1>
+   <!-- recommendations.html -->
+<!-- ... (other content) -->
+<!-- recommendations.html -->
+<!-- ... (other content) -->
+<ul>
+    {% for game in games %}
+    <li>
+        {% if game.Description %}
+            {{ game.Name }} (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
+            <p>Description: {{game.Description}}</p>
+        {% else %}
+            <a href="https://www.google.com/search?q={{ game.Name }}" target="_blank">{{ game.Name }}</a> (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
+            <form action="{{ url_for('save_game') }}" method="post">
+                <input type="hidden" name="game_id" value="{{ game.id }}">
+                <input type="submit" value="Save">
+            </form>
+        {% endif %}
+        {% if 'user_id' in session %}
+       
+            {% set game_saved = saved_game_ids.get(game.id) %}
+            {% if game_saved %}
+                <p>Game already saved.</p>
+            {% else %}
+                <form action="{{ url_for('save_game') }}" method="post">
+                    <input type="hidden" name="game_id" value="{{ game.id }}">
+                    <input type="submit" value="Save">
+                </form>
+            {% endif %}
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+<!-- ... (other content) -->
+
+<!-- ... (other content) -->
+
+    <button onclick="regenerateGames()">Regenerate</button>
+
+    <script>
+        function regenerateGames() {
+            window.location.reload();
+        }
+    </script>
+</body>
+</html>
