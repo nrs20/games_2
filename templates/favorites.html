@@ -8,20 +8,55 @@
     <a href="{{ url_for('index') }}">Home</a>
 
     <h1>My Favorites</h1>
+
+    <!-- Add the dropdown menu for filtering by genre -->
+    <label for="genre_filter">Filter by Genre:</label>
+    <select name="genre_filter" id="genre_filter" onchange="filterFavoritesByGenre()">
+        <option value="all">All Genres</option>
+        <option value="Action">Action</option>
+        <option value="Adventure">Adventure</option>
+        <option value="Puzzle">Puzzle</option>
+        <option value="Role-Playing">Role-Playing</option>
+        <option value="Misc">Misc</option>
+        <option value="Sports">Sports</option>
+        <option value="Racing">Racing</option>
+        <option value="Shooter">Shooter</option>
+        <option value="Simulation">Simulation</option>
+        <!-- Add more genre options here as needed -->
+    </select>
+
     {% if favorites %}
-        {% for game in favorites | unique(attribute='Name') %}
-            <div>
-                <h3>{{ game['Name'] }}</h3>
-                <p>Genre: {{ game['Genre'] }}</p>
-                <p>User Score: {{ game['User_Score'] }}</p>
-                <form action="{{ url_for('remove_from_favorites') }}" method="post">
-                    <input type="hidden" name="game_name" value="{{ game['Name'] }}">
-                    <button type="submit">Remove from Favorites</button>
-                </form>
-            </div>
-        {% endfor %}
+        <div id="favorites-container">
+            {% for game in favorites | unique(attribute='Name') %}
+                <div class="favorite-game">
+                    <h3><a href="https://www.google.com/search?q={{ game['Name'] }}" target="_blank">{{ game['Name'] }}</a></h3>
+                    <p>Genre: {{ game['Genre'] }}</p>
+                    <p>User Score: {{ game['User_Score'] }}</p>
+                    <form action="{{ url_for('remove_from_favorites') }}" method="post">
+                        <input type="hidden" name="game_name" value="{{ game['Name'] }}">
+                        <button type="submit">Remove from Favorites</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
     {% else %}
         <p>No favorite games found.</p>
     {% endif %}
+
+    <script>
+        function filterFavoritesByGenre() {
+            const selectedGenre = document.getElementById("genre_filter").value;
+            const favoriteGames = document.getElementsByClassName("favorite-game");
+
+            for (const game of favoriteGames) {
+                const genre = game.querySelector("p:nth-of-type(1)").textContent.split(": ")[1];
+                if (selectedGenre === "all" || genre.includes(selectedGenre)) {
+                    game.style.display = "block";
+                } else {
+                    game.style.display = "none";
+                }
+            }
+        }
+    </script>
 </body>
 </html>
