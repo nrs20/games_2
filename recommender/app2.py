@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, Markup, redirect, url_for, flash, session
+from flask import Flask, render_template, request, Markup, redirect, url_for, flash, session, jsonify
 import random
 import pandas as pd
 import numpy as np
@@ -9,69 +9,20 @@ from bs4 import BeautifulSoup
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo
+from flask_bcrypt import Bcrypt
+from flask_mysqldb import MySQL
+import MySQLdb.cursors
 app = Flask(__name__)
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import current_user
-from flask_login import LoginManager
-from flask_login import login_user, logout_user, login_required, current_user
 
-app.config['SECRET_KEY'] = 'poopy'  # Replace 'your_secret_key_here' with your actual secret key
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root@localhost/flask'
-db = SQLAlchemy(app)
+# MySQL configurations
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = ''
+app.config['MYSQL_DB'] = 'user-sysstem'  # Replace with your database name
+app.secret_key = 'xyzsdfg'
 
-class SavedGame(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    game_name = db.Column(db.String(200), nullable=False)
-    genre = db.Column(db.String(100), nullable=False)
-    platform = db.Column(db.String(100), nullable=False)
-    user_score = db.Column(db.Float, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+mysql = MySQL(app)
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(60), nullable=False)
-    saved_games = db.relationship('SavedGame', backref='user', lazy=True)
-
-login_manager = LoginManager(app)
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-from forms import RegistrationForm
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        new_user = User(username=form.username.data, password=form.password.data)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Account created successfully! You can now log in.', 'success')
-        return redirect(url_for('login'))
-    return render_template('register.html', form=form)
-# Your LoginForm (replace this with your actual LoginForm if you have one)
-class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Login')
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        # Assuming you have a User model with username and password fields
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and user.password == form.password.data:
-            # Set the user_id in the session to indicate the user is logged in
-            session['user_id'] = user.id
-            flash('Logged in successfully!', 'success')
-            return redirect(url_for('index'))  # Replace 'index' with your desired endpoint after login
-        else:
-            flash('Invalid username or password', 'danger')
-    return render_template('login.html', form=form)
 # Preprocessed game data
 df = pd.read_csv('Video_Games.csv')
 
@@ -95,10 +46,65 @@ for game in games:
     else:
         game['User_Score'] = float(game['User_Score'])
 
+# Login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    message = ''
+    if request.method == 'POST' and 'email' in request.form and 'password' in request.form:
+        email = request.form['email']
+        password = request.form['password']
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM user WHERE email = %s AND password = %s', (email, password,))
+        user = cursor.fetchone()
+        if user:
+            session['loggedin'] = True
+            session['name'] = user['name']
+            session['email'] = user['email']
+            message = 'Logged in successfully!'
+            return redirect(url_for('index'))  # Redirect to the recommendation page
+        else:
+            message = 'Please enter correct email / password!'
+    return render_template('login.html', message=message)
+
+# Logout route
+@app.route('/logout')
+def logout():
+    session.clear()  # Clear all session data
+    return redirect(url_for('login'))  # Redirect to the login page
+
+# Registration route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    message = ''
+    if request.method == 'POST' and 'username' in request.form and 'password' in request.form and 'email' in request.form:
+        username = request.form['username']
+        password = request.form['password']
+        email = request.form['email']
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT * FROM user WHERE email = %s', (email,))
+        account = cursor.fetchone()
+        if account:
+            message = 'Account already exists!'
+        elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+            message = 'Invalid email address!'
+        elif not username or not password or not email:
+            message = 'Please fill out the form!'
+        else:
+            cursor.execute('INSERT INTO user (username, email, password) VALUES (%s, %s, %s)', (username, email, password,))
+            mysql.connection.commit()
+            message = 'You have successfully registered!'
+    elif request.method == 'POST':
+        message = 'Please fill out the form!'
+    return render_template('register.html', message=message)
+
 @app.route("/")
 def index():
-    return render_template("index.html", current_user=current_user)
-def fetch_game_description(title):
+    # Display welcome message if user is logged in
+    if 'loggedin' in session:
+        return render_template("index.html", username=session['name'])
+    else:
+        return render_template("index.html")
+"""def fetch_game_description(title):
     # Replace YOUR_API_KEY with your actual API key from RAWG (sign up to get the API key)
     api_key = "33b676f49ef74f21860f648158668b42"
     formatted_title = title.replace(" ", "-").replace(":", "").replace("'", "").replace(".", "").lower()
@@ -133,8 +139,8 @@ def fetch_game_description(title):
             return clean_description
     except requests.exceptions.RequestException as e:
         print(f"Error fetching description for {title}: {e}")
-        return "Error fetching description."
-@app.route("/recommend", methods=["POST"])
+        return "Error fetching description."""
+
 @app.route("/recommend", methods=["POST"])
 def recommend_games():
     genre = request.form.get("genre")
@@ -150,85 +156,118 @@ def recommend_games():
         and game["User_Score"] >= user_score_threshold
     ]
 
-    # Fetch descriptions for each game using the RAWG API and save the games
-    user_id = session.get('user_id')
-    if user_id:
-        user = User.query.get(user_id)
-        for game in recommended_games:
-            title = game['Name']
-            description = fetch_game_description(title)
-            saved_game = SavedGame(
-                game_name=game['Name'],
-                genre=', '.join(game['Genre']),
-                platform=', '.join(game['Platform']),
-                user_score=game['User_Score'],
-                description=description,
-                user_id=user_id
-            )
-            db.session.add(saved_game)
-        db.session.commit()
+    # Fetch the user's favorites list from the database
+    favorites_list = []
+    if 'loggedin' in session and session['loggedin']:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT favorites FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
+        if user:
+            favorites_list_str = user.get('favorites')
+            favorites_list = favorites_list_str.split(',') if favorites_list_str else []
 
-    # Shuffle the recommended games list and choose 15 random games
-    random.shuffle(recommended_games)
-    recommended_games = recommended_games[:5]
+    # Create a list to store the recommended games that are not in favorites
+    new_recommended_games = []
 
-    print(recommended_games)  # Add this line to check the content of recommended_games
+    for game in recommended_games:
+        if game['Name'] not in favorites_list:
+            new_recommended_games.append(game)
 
-    return render_template("recommendations.html", games=recommended_games)
-@app.route("/save_game", methods=["POST"])
+    # Fetch descriptions for each game using the RAWG API
+    # for game in new_recommended_games:
+    #     title = game['Name']
+    #     game['Description'] = fetch_game_description(title)
+
+    # Shuffle the new recommended games list and choose 5 random games
+    random.shuffle(new_recommended_games)
+    new_recommended_games = new_recommended_games[:5]
+
+    return render_template("recommendations.html", games=new_recommended_games)
+
+# Rest of the code ...
+@app.route('/save_game', methods=['POST'])
 def save_game():
-    if 'user_id' not in session:
-        flash('You need to be logged in to save games.', 'warning')
-        return redirect(url_for('login'))
+    if 'loggedin' in session and session['loggedin']:
+        # Get the name of the game from the form data
+        game_name = request.form.get('game_name')
 
-    game_id = int(request.form.get('game_id'))
-    user_id = session['user_id']
+        # Get the user's favorites list from the database
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT favorites FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
 
-    # Check if the game is already saved by the user
-    saved_game = SavedGame.query.filter_by(user_id=user_id, id=game_id).first()
-    if saved_game:
-        flash('Game already saved.', 'info')
-    else:
-        game = next((game for game in games if game['id'] == game_id), None)
-        if game:
-            new_saved_game = SavedGame(
-                game_name=game['Name'],
-                genre=', '.join(game['Genre']),
-                platform=', '.join(game['Platform']),
-                user_score=game['User_Score'],
-                description=fetch_game_description(game['Name']),
-                user_id=user_id
-            )
-            db.session.add(new_saved_game)
-            db.session.commit()
-            flash('Game saved successfully!', 'success')
+        # Extract the existing favorites list or create an empty list if it's None
+        favorites_list_str = user.get('favorites') if user else ''
+        favorites_list = favorites_list_str.split(',') if favorites_list_str else []
+
+        # Add the game name to the favorites list if it's not already in there
+        if game_name not in favorites_list:
+            favorites_list.append(game_name)
+
+            # Update the user's favorites list in the database
+            favorites_list_str = ','.join(favorites_list)
+            cursor.execute('UPDATE user SET favorites = %s WHERE email = %s', (favorites_list_str, session['email'],))
+            mysql.connection.commit()
+
+            # Return an empty response (status code 200) to indicate success
+            return '', 200
         else:
-            flash('Game not found.', 'danger')
+            # Return an empty response (status code 200) to indicate the game already exists in favorites
+            return '', 200
+    else:
+        # Return an empty response (status code 401) to indicate that the user is not logged in
+        return '', 401
+@app.route('/favorites', endpoint='favorites')
+def show_favorites():
+    if 'loggedin' in session and session['loggedin']:
+        # Get the user's favorites list from the database
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT favorites FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
 
-    return redirect(url_for('index'))
-@app.route('/logout')
-def logout():
-    # Clear the user's session data
-    session.pop('user_id', None)
-    flash('Logged out successfully!', 'success')
-    return redirect(url_for('login'))
-@app.route('/remove_saved_game/<int:game_id>', methods=['POST'])
-def remove_saved_game(game_id):
-    if 'user_id' not in session:
-        flash('You need to be logged in to remove saved games.', 'warning')
+        # Extract the existing favorites list or create an empty list if it's None
+        favorites_list_str = user.get('favorites') if user else ''
+        favorites_list = favorites_list_str.split(',') if favorites_list_str else []
+
+        # Get the complete game data for each game in the favorites list
+        favorite_games = [game for game in games if game['Name'] in favorites_list]
+
+        return render_template('favorites.html', favorites=favorite_games)
+    else:
         return redirect(url_for('login'))
 
-    saved_game = SavedGame.query.get(game_id)
 
-    if not saved_game:
-        flash('Game not found.', 'danger')
-        return redirect(url_for('index'))
+@app.route('/remove_from_favorites', methods=['POST'])
+def remove_from_favorites():
+    if 'loggedin' in session and session['loggedin']:
+        # Get the name of the game to be removed from the form data
+        game_name = request.form.get('game_name')
 
-    db.session.delete(saved_game)
-    db.session.commit()
-    flash('Game removed from saved games.', 'success')
+        # Get the user's favorites list from the database
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT favorites FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
 
-    return redirect(url_for('index'))
+        # Extract the existing favorites list or create an empty list if it's None
+        favorites_list_str = user.get('favorites') if user else ''
+        favorites_list = favorites_list_str.split(',') if favorites_list_str else []
 
+        # Remove the game name from the favorites list if it's in there
+        if game_name in favorites_list:
+            favorites_list.remove(game_name)
+
+            # Update the user's favorites list in the database
+            favorites_list_str = ','.join(favorites_list)
+            cursor.execute('UPDATE user SET favorites = %s WHERE email = %s', (favorites_list_str, session['email'],))
+            mysql.connection.commit()
+
+            # Redirect back to the favorites page after removing the game
+            return redirect(url_for('favorites'))
+        else:
+            # If the game is not in the favorites list, do nothing
+            flash('Game not found in favorites.')
+            return redirect(url_for('favorites'))
+    else:
+        return redirect(url_for('login'))  # Redirect to the login page if not logged in
 if __name__ == "__main__":
     app.run(debug=True)
