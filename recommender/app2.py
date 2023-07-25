@@ -173,10 +173,10 @@ def recommend_games():
         if game['Name'] not in favorites_list:
             new_recommended_games.append(game)
 
-    # Fetch descriptions for each game using the RAWG API
-    # for game in new_recommended_games:
-    #     title = game['Name']
-    #     game['Description'] = fetch_game_description(title)
+    # Fetch descriptions for each game using the RAWG API and store them in the 'Description' field
+    #for game in new_recommended_games:
+      #  title = game['Name']
+       # game['Description'] = fetch_game_description(title)
 
     # Shuffle the new recommended games list and choose 5 random games
     random.shuffle(new_recommended_games)
@@ -232,10 +232,14 @@ def show_favorites():
         # Get the complete game data for each game in the favorites list
         favorite_games = [game for game in games if game['Name'] in favorites_list]
 
+        # Attach the Reddit URL to the favorite games
+        for game in favorite_games:
+            reddit_url = game.get('reddit_url')
+            game['Reddit_URL'] = reddit_url if reddit_url else 'No Reddit URL available.'
+
         return render_template('favorites.html', favorites=favorite_games)
     else:
         return redirect(url_for('login'))
-
 
 @app.route('/remove_from_favorites', methods=['POST'])
 def remove_from_favorites():
