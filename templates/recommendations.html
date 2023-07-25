@@ -2,50 +2,64 @@
 <html>
 <head>
     <title>Recommended Games</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
+
 </head>
 <body>
+    <a href="{{ url_for('index') }}">Home</a>
     <h1>Recommended Games</h1>
-   <!-- recommendations.html -->
-<!-- ... (other content) -->
-<!-- recommendations.html -->
-<!-- ... (other content) -->
-<ul>
-    {% for game in games %}
-    <li>
-        {% if game.Description %}
-            {{ game.Name }} (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
-            <p>Description: {{game.Description}}</p>
-        {% else %}
-            <a href="https://www.google.com/search?q={{ game.Name }}" target="_blank">{{ game.Name }}</a> (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
-            <form action="{{ url_for('save_game') }}" method="post">
-                <input type="hidden" name="game_id" value="{{ game.id }}">
-                <input type="submit" value="Save">
-            </form>
-        {% endif %}
-        {% if 'user_id' in session %}
-       
-            {% set game_saved = saved_game_ids.get(game.id) %}
-            {% if game_saved %}
-                <p>Game already saved.</p>
+    <ul>
+        {% for game in games %}
+        <li>
+            {% if game.Description %}
+                {{ game.Name }} (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
+                <p>Description: {{game.Description}}</p>
             {% else %}
-                <form action="{{ url_for('save_game') }}" method="post">
-                    <input type="hidden" name="game_id" value="{{ game.id }}">
-                    <input type="submit" value="Save">
+                <a href="https://www.google.com/search?q={{ game.Name }}" target="_blank">{{ game.Name }}</a> (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
+            {% endif %}
+            {% if 'loggedin' in session and session['loggedin'] %}
+                <form onsubmit="return saveGame('{{ game.Name }}')">
+                    <input type="hidden" name="game_name" value="{{ game.Name }}">
+                    <button type="submit">Save</button>
                 </form>
             {% endif %}
-        {% endif %}
-    </li>
-    {% endfor %}
-</ul>
-<!-- ... (other content) -->
-
-<!-- ... (other content) -->
-
+        </li>
+        {% endfor %}
+    </ul>
     <button onclick="regenerateGames()">Regenerate</button>
 
     <script>
         function regenerateGames() {
             window.location.reload();
+        }
+
+        function saveGame(gameName) {
+            // Send the form data using AJAX
+            var formData = new FormData();
+            formData.append('game_name', gameName);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/save_game', true);
+
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    // Display the success message in a popup
+                    alert('Game saved to favorites successfully!');
+                } else {
+                    // Display the error message in a popup
+                    alert('Error saving the game to favorites.');
+                }
+            };
+
+            xhr.onerror = function () {
+                // Display the error message in a popup
+                alert('Error saving the game to favorites.');
+            };
+
+            xhr.send(formData);
+
+            // Prevent the form from submitting in the default way
+            return false;
         }
     </script>
 </body>
