@@ -3,7 +3,6 @@
 <head>
     <title>Recommended Games</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
-
 </head>
 <body>
     <a href="{{ url_for('index') }}">Home</a>
@@ -11,12 +10,33 @@
     <ul>
         {% for game in games %}
         <li>
-            {% if game.Description %}
-                {{ game.Name }} (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
-                <p>Description: {{game.Description}}</p>
-            {% else %}
-                <a href="https://www.google.com/search?q={{ game.Name }}" target="_blank">{{ game.Name }}</a> (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{game.Platform}})
+
+            <a href="https://www.google.com/search?q={{ game.Name }}" target="_blank">{{ game.Name }}</a>
+            (Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{ game.Platform }})
+            {% if game_info %}
+            <h2>Game Information:</h2>
+            <ul>
+            {% for game_name, reddit_link in game_info.items() %}
+                    <li>{{ game_name }}: {% if reddit_link %}<a href="{{ reddit_link }}" target="_blank">{{ reddit_link }}</a>{% else %}Not Found.{% endif %}</li>
+                {% endfor %}
+            </ul>            {% else %}
+            <p> NOT POPULATED </p>
+
             {% endif %}
+            <p> Here is the reddit {{ game_info[game.Genre][game.Name] }}</a></p>
+
+            <p>
+                Reddit Community: {% if game_info.get(game.Name) %}
+                <a href="{{ game_info[game.Name] }}" target="_blank">{{ game_info[game.Name] }}</a>
+                <span>HEIOFNNO</span>
+                <span> Here is the reddit {{ game_info[game.Genre][game.Name] }}</a></span>
+                {% elif game.Genre == "Shooter" and game_info.Shooter and game_info.Shooter.get(game.Name) %}
+                <a href="{{ game_info.Shooter[game.Name] }}" target="_blank">{{ game_info.Shooter[game.Name] }}</a>
+                
+                {% else %}
+                Not Found.
+                {% endif %}
+            </p>
             {% if 'loggedin' in session and session['loggedin'] %}
                 <form onsubmit="return saveGame('{{ game.Name }}')">
                     <input type="hidden" name="game_name" value="{{ game.Name }}">
