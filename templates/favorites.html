@@ -11,7 +11,7 @@
 
     <!-- Add the dropdown menu for filtering by genre -->
     <label for="genre_filter">Filter by Genre:</label>
-    <select name="genre_filter" id="genre_filter" onchange="filterFavoritesByGenre()">
+    <select name="genre_filter" id="genre_filter" onchange="filterFavorites()">
         <option value="all">All Genres</option>
         <option value="Action">Action</option>
         <option value="Adventure">Adventure</option>
@@ -25,38 +25,92 @@
         <!-- Add more genre options here as needed -->
     </select>
 
+    <!-- Add the dropdown menu for filtering by user score 
+    <label for="user_score_filter">Filter by User Score:</label>
+    <select name="user_score_filter" id="user_score_filter" onchange="filterFavorites()">
+        <option value="all">All Scores</option>
+        <option value="9.0">9.0+</option>
+        <option value="8.0">8.0+</option>
+        <option value="7.0">7.0+</option>
+        <option value="6.0">6.0+</option>
+        <option value="5.0">5.0+</option>
+        <option value="4.0">4.0+</option>
+        <option value="3.0">3.0+</option>
+        <option value="2.0">2.0+</option>
+        <option value="1.0">1.0+</option>
+-->
+        <!-- Add more user score options here as needed -->
+    </select>
+
     {% if favorites %}
-        <div id="favorites-container">
-            {% for game in favorites | unique(attribute='Name') %}
-                <div class="favorite-game">
-                    <h3><a href="https://www.google.com/search?q={{ game['Name'] }}" target="_blank">{{ game['Name'] }}</a></h3>
-                    <p>Genre: {{ game['Genre'] }}</p>
-                    <p>User Score: {{ game['User_Score'] }}</p>
-                    <form action="{{ url_for('remove_from_favorites') }}" method="post">
-                        <input type="hidden" name="game_name" value="{{ game['Name'] }}">
-                        <button type="submit">Remove from Favorites</button>
-                    </form>
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p>No favorite games found.</p>
-    {% endif %}
+    <div id="favorites-container">
+        {% for game in favorites | unique(attribute='Name') %}
+            <div class="favorite-game">
+                <h3><a href="https://www.google.com/search?q={{ game['Name'] }}" target="_blank">{{ game['Name'] }}</a></h3>
+                <p>Genre: {{ game['Genre'] }}</p>
+                <p>User Score: {{ game['User_Score'] }}</p>
+                <!-- Display the Reddit URL for the game -->
+                 {% if game.Genre|join(", ") in game_info %}
+                    <a href="{{ game_info[game.Genre|join(", ")][game.Name] }}" target="_blank">{{ game.Name }} Reddit Community</a>
+                    </a>
+                {% else %}
+                    Not Found.
+                {% endif %}</p>
+
+                <form action="{{ url_for('remove_from_favorites') }}" method="post">
+                    <input type="hidden" name="game_name" value="{{ game['Name'] }}">
+                    <button type="submit">Remove from Favorites</button>
+                </form>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No favorite games found.</p>
+{% endif %}
 
     <script>
-        function filterFavoritesByGenre() {
+        // Function to sort the games by user score in descending order
+        function sortGamesByScore() {
+            const favoriteGames = document.getElementsByClassName("favorite-game");
+            const gamesArray = Array.from(favoriteGames);
+    
+            gamesArray.sort((gameA, gameB) => {
+                const userScoreA = parseFloat(gameA.querySelector("p:nth-of-type(2)").textContent.split(": ")[1]);
+                const userScoreB = parseFloat(gameB.querySelector("p:nth-of-type(2)").textContent.split(": ")[1]);
+                return userScoreB - userScoreA;
+            });
+    
+            // Clear the existing games in the container
+            const favoritesContainer = document.getElementById("favorites-container");
+            favoritesContainer.innerHTML = "";
+    
+            // Add the sorted games back to the container
+            for (const game of gamesArray) {
+                favoritesContainer.appendChild(game);
+            }
+        }
+    
+        function filterFavorites() {
             const selectedGenre = document.getElementById("genre_filter").value;
             const favoriteGames = document.getElementsByClassName("favorite-game");
-
+    
             for (const game of favoriteGames) {
                 const genre = game.querySelector("p:nth-of-type(1)").textContent.split(": ")[1];
-                if (selectedGenre === "all" || genre.includes(selectedGenre)) {
+                const genreMatch = selectedGenre === "all" || genre.includes(selectedGenre);
+    
+                if (genreMatch) {
                     game.style.display = "block";
                 } else {
                     game.style.display = "none";
                 }
             }
         }
+    
+        // Call the sorting and filtering functions on page load
+        window.onload = function () {
+            sortGamesByScore();
+            filterFavorites();
+        };
     </script>
 </body>
 </html>
