@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import requests
 import re
+from flask import copy_current_request_context
+import json
 import urllib.parse 
 from bs4 import BeautifulSoup
 from flask_wtf import FlaskForm
@@ -61,6 +63,11 @@ def login():
             session['name'] = user['name']
             session['email'] = user['email']
             message = 'Logged in successfully!'
+            game_info_json = user.get('game_info', None)
+            if game_info_json:
+                session['game_info'] = json.loads(game_info_json)
+            else:
+                session['game_info'] = {}  # Initialize an empty dictionary if no game_info found
             return redirect(url_for('index'))  # Redirect to the recommendation page
         else:
             message = 'Please enter correct email / password!'
@@ -69,6 +76,11 @@ def login():
 # Logout route
 @app.route('/logout')
 def logout():
+    if 'game_info' in session:
+        game_info_json = json.dumps(session['game_info'])
+        cursor = mysql.connection.cursor()
+        cursor.execute('UPDATE user SET game_info = %s WHERE email = %s', (game_info_json, session['email'],))
+        mysql.connection.commit()
     session.clear()  # Clear all session data
     return redirect(url_for('login'))  # Redirect to the login page
 
@@ -104,49 +116,66 @@ def index():
         return render_template("index.html", username=session['name'])
     else:
         return render_template("index.html")
-"""def fetch_game_description(title):
-    # Replace YOUR_API_KEY with your actual API key from RAWG (sign up to get the API key)
-    api_key = "33b676f49ef74f21860f648158668b42"
-    formatted_title = title.replace(" ", "-").replace(":", "").replace("'", "").replace(".", "").lower()
 
-    # Remove consecutive hyphens (replace them with a single hyphen)
-    formatted_title = formatted_title.replace("--", "-")    
-    url = f"https://api.rawg.io/api/games/{formatted_title.lower()}?key={api_key}"
+def fetch_game_info(game_slug):
+    api_key = "33b676f49ef74f21860f648158668b42"  # Replace YOUR_API_KEY with your actual API key from RAWG
+    game_slug = game_slug.lower().replace(" ", "-").replace("'", "").replace(".", "").replace(":", "")
+    url = f"https://api.rawg.io/api/games/{game_slug}?key={api_key}"
 
     try:
         response = requests.get(url)
         response.raise_for_status()
         game_data = response.json()
 
-        # Get the description from the API response
-        description = game_data.get("description", "Description not available.")
-        if description == "Description not available.":
-            # If description is not available, create a Google search link
-            google_search_link = f"https://www.google.com/search?q={urllib.parse.quote(title)}"
-            return Markup(f"Description not available. <a href='{google_search_link}' target='_blank'>Search on Google</a>.")
+        if game_data:
+            reddit_url = game_data.get("reddit_url", None)
+            return reddit_url
         else:
-  # Use BeautifulSoup to remove HTML elements and convert HTML entities
-            soup = BeautifulSoup(description, "html.parser")
-            clean_description = soup.get_text()
-        # Remove HTML tags from the description using regular expression
-            clean_description = re.sub('<[^<]+?>', '', description)
+            return None  # Return None when no game data is found
 
-        # Split the description into sentences and take the first two sentences
-            sentences = clean_description.split('. ')
-            if len(sentences) >= 2:
-                clean_description = '. '.join(sentences[:2])
-
-            return clean_description
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching description for {title}: {e}")
-        return "Error fetching description."""
+        # Print the error but continue processing other games
+        print(f"Error fetching game info: {e}")
+        return None
+    except ValueError as e:
+        # Print the error but continue processing other games
+        print(f"Error parsing game info: {e}")
+        return None
 
-@app.route("/recommend", methods=["POST"])
-def recommend_games():
-    genre = request.form.get("genre")
-    platform = request.form.get("platform")
-    user_score_threshold = float(request.form.get("user_score"))
 
+def search_game_by_title(title):
+    api_key = "33b676f49ef74f21860f648158668b42"  # Replace YOUR_API_KEY with your actual API key from RAWG
+
+    # Format the search term to create the API request URL
+    slug = title.lower().replace(" ", "-").replace("'", "").replace(".", "").replace(":", "")
+
+    search_url = f"https://api.rawg.io/api/games?search={slug}&key={api_key}"
+    
+    try:
+        response = requests.get(search_url)
+        response.raise_for_status()
+        search_results = response.json()
+
+        # Check if there are search results
+        if search_results["count"] > 0:
+            # Get the first game's slug (assuming the first result is the most relevant)
+            game_slug = search_results["results"][0]["slug"]
+            
+            # Fetch the game description using the accurate slug
+            game_description = fetch_game_info(game_slug)
+            return game_description, game_slug
+
+        else:
+            return "No games found.", None
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error searching for game {title}: {e}")
+        return "Error searching for game.", None
+    except ValueError as e:
+        print(f"Error parsing game info for {title}: {e}")
+        return "Error parsing game info.", None
+
+def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
     # Implement your recommendation logic based on user input
     recommended_games = [
         game for game in games
@@ -156,34 +185,65 @@ def recommend_games():
         and game["User_Score"] >= user_score_threshold
     ]
 
-    # Fetch the user's favorites list from the database
-    favorites_list = []
-    if 'loggedin' in session and session['loggedin']:
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT favorites FROM user WHERE email = %s', (session['email'],))
-        user = cursor.fetchone()
-        if user:
-            favorites_list_str = user.get('favorites')
-            favorites_list = favorites_list_str.split(',') if favorites_list_str else []
+    # Fetch the user's favorites list from the database and create a list of recommended games that are not in favorites
+    favorites_list = session.get("favorites_list", [])
+    new_recommended_games = [game for game in recommended_games if game['Name'] not in favorites_list]
 
-    # Create a list to store the recommended games that are not in favorites
-    new_recommended_games = []
+    # Fetch the existing game_info from the session, or initialize an empty dictionary
+    game_info = session.get("game_info", {})
 
-    for game in recommended_games:
-        if game['Name'] not in favorites_list:
-            new_recommended_games.append(game)
+    # Initialize an empty dictionary for the current genre if it doesn't already exist
+    if genre not in game_info:
+        game_info[genre] = {}
 
-    # Fetch descriptions for each game using the RAWG API and store them in the 'Description' field
-    #for game in new_recommended_games:
-      #  title = game['Name']
-       # game['Description'] = fetch_game_description(title)
+    # Update the game_info with the fetched data for the current genre
+    for game in new_recommended_games:
+        title = game['Name']
+        game_slug = title.lower().replace(" ", "-")  # Format the title to create the API request URL
+        game_info[genre][title] = fetch_game_info(game_slug)
 
-    # Shuffle the new recommended games list and choose 5 random games
+        # Update the game dictionary with the fetched data
+        if game_info[genre].get(title):
+            # Check if game_info[genre][title] is a dictionary before accessing 'Reddit_URL'
+            if isinstance(game_info[genre][title], dict):
+                game['Reddit_URL'] = game_info[genre][title].get('Reddit_URL', None)
+            else:
+                game['Reddit_URL'] = None
+
+    # Shuffle the new recommended games
     random.shuffle(new_recommended_games)
-    new_recommended_games = new_recommended_games[:5]
+    print("game_info:", game_info)
+    print("DONE")
 
-    return render_template("recommendations.html", games=new_recommended_games)
+    # Store the shuffled recommended games and the updated game_info for the current genre in the session
+    session["recommended_games"] = new_recommended_games[:5]
+    session["game_info"] = game_info
+    session["favorites_list"] = favorites_list
 
+
+# Route to handle the initial recommendation request
+@app.route("/recommend", methods=["POST"])
+def recommend_games():
+    genre = request.form.get("genre")
+    platform = request.form.get("platform")
+    user_score_threshold = float(request.form.get("user_score"))
+
+    # Fetch and store the recommended games in the session
+    fetch_and_store_recommended_games(genre, platform, user_score_threshold)
+    game_info = session.get("game_info", {})
+    print("GAME INGO IN RECOMMEND", game_info)
+    print("THIS IS GAMES", games)
+    return render_template("recommendations.html", games=session["recommended_games"], game_info=game_info)
+
+# Route to handle the regenerate button click
+@app.route("/regenerate", methods=["POST"])
+def regenerate_games():
+    # Check if recommended games are already stored in the session
+    if "recommended_games" in session:
+        # Shuffle the existing recommended games
+        random.shuffle(session["recommended_games"])
+
+    return "Regeneration successful", 200
 # Rest of the code ...
 @app.route('/save_game', methods=['POST'])
 def save_game():
@@ -237,9 +297,14 @@ def show_favorites():
             reddit_url = game.get('reddit_url')
             game['Reddit_URL'] = reddit_url if reddit_url else 'No Reddit URL available.'
 
-        return render_template('favorites.html', favorites=favorite_games)
+        # Fetch the game info from the session
+        game_info = session.get('game_info', {})
+
+        return render_template('favorites.html', favorites=favorite_games, game_info=game_info)
     else:
         return redirect(url_for('login'))
+
+
 
 @app.route('/remove_from_favorites', methods=['POST'])
 def remove_from_favorites():
