@@ -62,15 +62,12 @@
         {% for game_name, game in favorites.items() %}
             <div class="favorite-game">
                 <h3><a href="https://www.google.com/search?q={{ game['Name'] }}" target="_blank">{{ game['Name'] }}</a></h3>
-                {% if 'photo' in game_info[game.Genre|join(", ")][game.Name] %}
-            <img src="{{ game_info[game.Genre|join(", ")][game.Name]['photo'] }}"
-            alt="{{ game.Name }} Photo"
-            width="400" 
-            height="300">
+                {% if game['photo']%}
+                <img src="{{ game['photo'] }}" alt="{{ game.Name }} Photo" width="400" height="300">
 
             {% else %}
+            <p>No photo available.</p>
             <!-- Display a default image or placeholder if no photo available -->
-            <p> No image available </p>
             {% endif %}
 
                 <p>Genre: {{ ', '.join(game['Genre']) }}</p>
@@ -99,9 +96,10 @@
         {% endif %}
         <br>
 
-            <ul>       
-                     <p>Stores:</p>
-
+        {% if game.Genre|join(", ") in game_info and game_info[game.Genre|join(", ")][game.Name]["stores"] %}
+        <p class="game-stores">
+            Stores:
+            <ul>
                 {% for store in game_info[game.Genre|join(", ")][game.Name]["stores"] %}
                     {% if store.domain %}
                     <li><a href="https://{{ store.domain }}" target="_blank" data-store="{{ store.name }}">{{ store.name }}</a></li>
@@ -111,7 +109,9 @@
                 {% endfor %}
             </ul>
         </p>
-    
+    {% else %}
+        Stores Not Found.
+    {% endif %}
 
 
             {% if 'metacritic' in game %}
