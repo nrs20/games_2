@@ -166,18 +166,18 @@
             const selectedGenre = document.getElementById("genre_filter").value;
             const selectedRedditFilter = document.getElementById("reddit_filter").value;
             const favoriteGames = document.getElementsByClassName("favorite-game");
-        
+    
             for (const game of favoriteGames) {
                 const genre = game.querySelector("p:nth-of-type(1)").textContent.split(": ")[1];
                 const genreMatch = selectedGenre === "all" || genre.includes(selectedGenre);
-        
+    
                 let redditMatch = true;
                 if (selectedRedditFilter === "with_reddit") {
                     redditMatch = game.querySelector("a[href^='https://www.reddit.com/']") !== null;
                 } else if (selectedRedditFilter === "without_reddit") {
                     redditMatch = game.querySelector("a[href^='https://www.reddit.com/']") === null;
                 }
-        
+    
                 if (genreMatch && redditMatch) {
                     game.style.display = "block";
                 } else {
@@ -185,7 +185,7 @@
                 }
             }
         }
-        
+    
         // Call the sorting and filtering functions on page load
         window.onload = function () {
             sortGamesByScore();
