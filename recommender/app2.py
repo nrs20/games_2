@@ -149,7 +149,7 @@ def index():
         return render_template("index.html")
 
 def fetch_game_info(game_slug):
-    api_key = "33b676f49ef74f21860f648158668b42"  # Replace YOUR_API_KEY with your actual API key from RAWG
+    api_key = "33b676f49ef74f21860f648158668b42"
     game_slug = game_slug.lower().replace(" ", "-").replace("'", "").replace(".", "").replace(":", "")
     url = f"https://api.rawg.io/api/games/{game_slug}?key={api_key}"
 
@@ -162,19 +162,28 @@ def fetch_game_info(game_slug):
             reddit_url = game_data.get("reddit_url", None)
             developers = game_data.get("developers", [])
             meta = game_data.get("metacritic_url", None)
+            photo = game_data.get("background_image", None)
+            website = game_data.get("website", None)
+
+            # Get the stores information
+            stores = []
+            for store_data in game_data.get("stores", []):
+                store_name = store_data["store"]["name"]
+                store_domain = store_data["store"]["domain"]
+
+                stores.append({"name": store_name, "domain": store_domain})
+
             developer_names = [developer["name"] for developer in developers]
-            return reddit_url, developer_names, meta
+            return reddit_url, developer_names, meta, stores, photo, website  # Include stores information
         else:
-            return None, [], None  # Return None when no game data is found
+            return None, [], None, []  # Return None for all values when no game data is found
 
     except requests.exceptions.RequestException as e:
-        # Print the error but continue processing other games
         print(f"Error fetching game info: {e}")
-        return None, [], None
+        return None, [], None, []
     except ValueError as e:
-        # Print the error but continue processing other games
         print(f"Error parsing game info: {e}")
-        return None, [], None
+        return None, [], None, []
 
 
 
@@ -204,11 +213,14 @@ def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
         title = game['Name']
         game_slug = title.lower().replace(" ", "-")  # Format the title to create the API request URL
         #game_info[genre][title] = fetch_game_info(game_slug)
-        reddit_url, developer_names, meta = fetch_game_info(game_slug)
+        reddit_url, developer_names, meta, stores, photo, website = fetch_game_info(game_slug)
         game_info[genre][title] = {
             "reddit_url": reddit_url,
             "developers": developer_names,
             "metacritic":meta,
+            "stores": stores,
+            "photo": photo,
+            "website": website,
             "platform": game['Platform']
 
         }
@@ -219,11 +231,18 @@ def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
                 game['reddit_url'] = game_info[genre][title].get('reddit_url', None)
                 game['metacritic'] = game_info[genre][title].get('metacritic_url', None)
                 game['developers'] = developer_names
-   
+                game['stores'] =  stores
+                game['photo'] =  photo
+                game['website'] =  website
+
             else:
                 game['reddit_url'] = None
                 game['metacritic'] = None
                 game['developers'] = None
+                game['stores'] = None
+                game['photo'] = None
+                game['website'] = None
+
 
     # Shuffle the new recommended games
     random.shuffle(new_recommended_games)
@@ -326,12 +345,19 @@ def show_favorites():
                 reddit_url = game_data.get('reddit_url')
                 developers = game_data.get('developers')
                 meta = game_data.get('metacritic')
+                stores = game_data.get('stores')
+                photo = game_data.get('photo')
+                website = game_data.get('website')
 
                 # Create a dictionary with the game_name as the key and the required information as the value
                 game_info_data = {
                     'reddit_url': reddit_url if reddit_url else 'No Reddit URL available.',
                     'developers': developers if developers else 'No developer available',
-                    'metacritic': meta if meta else 'No Metacritic URL available.'
+                    'metacritic': meta if meta else 'No Metacritic URL available.',
+                    'stores': stores if stores else 'No Store URL available.',
+                    'photo': photo if photo else 'No Photo URL available.',
+                    'website': website if website else 'No website URL available.'
+
                 }
 
                 # Add the game_info_data to the corresponding genre in the game_info dictionary
@@ -376,11 +402,17 @@ def show_favorites():
             reddit_url = game_info_data.get('reddit_url')
             developers = game_info_data.get('developers')
             meta = game_info_data.get('metacritic')
+            stores = game_info_data.get('stores')
+            photo = game_info_data.get('photo')
+            website = game_info_data.get('website')
 
             # Update the game_data dictionary with the retrieved data
             game_data['reddit_url'] = reddit_url if reddit_url else 'No Reddit URL available.'
             game_data['developers'] = developers if developers else 'No developer available'
             game_data['metacritic'] = meta if meta else 'No Metacritic URL available.'
+            game_data['stores'] = stores if stores else 'No Store URL available.'
+            game_data['photo'] = photo if photo else 'No Photo URL available.'
+            game_data['website'] = website if website else 'No website URL available.'
 
         # Implement search functionality
         search_query = request.args.get('search')
