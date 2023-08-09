@@ -2,13 +2,20 @@
 <html>
 <head>
     <title>My Favorites</title>
+    <link rel="icon" type="image/x-icon" href="images\favicon.ico">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
 </head>
+
 <body>
     <a href="{{ url_for('index') }}">Home</a>
 
     <h1>My Favorites</h1>
+    <a href="{{ url_for('favorites') }}" class="btn btn-primary">Show All Favorite Games</a>
 
+    <form method="get">
+        <input type="text" name="search" placeholder="Search for a game">
+        <button type="submit">Search</button>
+    </form>
     <!-- Add the dropdown menu for filtering by genre -->
     <label for="genre_filter">Filter by Genre:</label>
     <select name="genre_filter" id="genre_filter" onchange="filterFavorites()">
@@ -24,6 +31,13 @@
         <option value="Simulation">Simulation</option>
         <!-- Add more genre options here as needed -->
     </select>
+<!-- Add the dropdown menu for filtering by Reddit community -->
+<label for="reddit_filter">Filter by Reddit Community:</label>
+<select name="reddit_filter" id="reddit_filter" onchange="filterFavorites()">
+    <option value="all">All Games</option>
+    <option value="with_reddit">With Reddit Community</option>
+    <option value="without_reddit">Without Reddit Community</option>
+</select>
 
     <!-- Add the dropdown menu for filtering by user score 
     <label for="user_score_filter">Filter by User Score:</label>
@@ -43,20 +57,78 @@
     </select>
 
     {% if favorites %}
+
     <div id="favorites-container">
-        {% for game in favorites | unique(attribute='Name') %}
+        {% for game_name, game in favorites.items() %}
             <div class="favorite-game">
                 <h3><a href="https://www.google.com/search?q={{ game['Name'] }}" target="_blank">{{ game['Name'] }}</a></h3>
-                <p>Genre: {{ game['Genre'] }}</p>
-                <p>User Score: {{ game['User_Score'] }}</p>
-                <!-- Display the Reddit URL for the game -->
-                 {% if game.Genre|join(", ") in game_info %}
-                    <a href="{{ game_info[game.Genre|join(", ")][game.Name] }}" target="_blank">{{ game.Name }} Reddit Community</a>
-                    </a>
-                {% else %}
-                    Not Found.
-                {% endif %}</p>
+                {% if 'photo' in game_info[game.Genre|join(", ")][game.Name] %}
+            <img src="{{ game_info[game.Genre|join(", ")][game.Name]['photo'] }}"
+            alt="{{ game.Name }} Photo"
+            width="400" 
+            height="300">
 
+            {% else %}
+            <!-- Display a default image or placeholder if no photo available -->
+            <p> No image available </p>
+            {% endif %}
+
+                <p>Genre: {{ ', '.join(game['Genre']) }}</p>
+                <p>User Score: {{ game['User_Score'] }}</p>
+                
+                <!-- Display the Reddit URL for the game -->
+                {% if 'reddit_url' in game %}
+                {% if game['reddit_url'] != 'No Reddit URL available.' %}
+                    Reddit Community: <a href="{{ game['reddit_url'] }}" target="_blank">{{ game['reddit_url'] }}</a>
+                {% else %}
+                    {{ game['reddit_url'] }}
+                {% endif %}
+            {% else %}
+                Reddit URL not available.
+            {% endif %}
+                <br>
+                <br>
+            {% if 'website' in game %}
+            {% if game['website'] != 'No website URL available.' %}
+                Game Website: <a href="{{ game['website'] }}" target="_blank">{{ game['website'] }}</a>
+            {% else %}
+                Website URL not available.
+            {% endif %}
+        {% else %}
+        Website URL not available.
+        {% endif %}
+        <br>
+
+            <ul>       
+                     <p>Stores:</p>
+
+                {% for store in game_info[game.Genre|join(", ")][game.Name]["stores"] %}
+                    {% if store.domain %}
+                    <li><a href="https://{{ store.domain }}" target="_blank" data-store="{{ store.name }}">{{ store.name }}</a></li>
+                    {% else %}
+                        <li>No store information available</li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </p>
+    
+
+
+            {% if 'metacritic' in game %}
+                {% if game['metacritic'] != 'No Metacritic URL available.' %}
+                    Metacritic: <a href="{{ game['metacritic'] }}" target="_blank">{{ game['metacritic'] }}</a>
+                {% else %}
+                    Metacritic URL not available.
+                {% endif %}
+                {% else %}
+                MetaCritic URL not available.
+            {% endif %}
+            
+                {% if game['developers'] != 'No Developer information available.' %}
+                <p>Developers: {{ ', '.join(game['developers']) }}</p>
+            {% else %}
+                Developer information not available.
+            {% endif %}
                 <form action="{{ url_for('remove_from_favorites') }}" method="post">
                     <input type="hidden" name="game_name" value="{{ game['Name'] }}">
                     <button type="submit">Remove from Favorites</button>
@@ -92,20 +164,28 @@
     
         function filterFavorites() {
             const selectedGenre = document.getElementById("genre_filter").value;
+            const selectedRedditFilter = document.getElementById("reddit_filter").value;
             const favoriteGames = document.getElementsByClassName("favorite-game");
-    
+        
             for (const game of favoriteGames) {
                 const genre = game.querySelector("p:nth-of-type(1)").textContent.split(": ")[1];
                 const genreMatch = selectedGenre === "all" || genre.includes(selectedGenre);
-    
-                if (genreMatch) {
+        
+                let redditMatch = true;
+                if (selectedRedditFilter === "with_reddit") {
+                    redditMatch = game.querySelector("a[href^='https://www.reddit.com/']") !== null;
+                } else if (selectedRedditFilter === "without_reddit") {
+                    redditMatch = game.querySelector("a[href^='https://www.reddit.com/']") === null;
+                }
+        
+                if (genreMatch && redditMatch) {
                     game.style.display = "block";
                 } else {
                     game.style.display = "none";
                 }
             }
         }
-    
+        
         // Call the sorting and filtering functions on page load
         window.onload = function () {
             sortGamesByScore();
