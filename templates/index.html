@@ -3,14 +3,20 @@
 <head>
     <title>Game Recommender</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
+    <link rel="icon" type="image/x-icon" href="images/pink.jpeg"/>
 
 </head>
 <body>
-    <h1>Game Recommender</h1>
-    {% if 'loggedin' in session %}
-    <p>Welcome, {{ session['name'] }}!</p>
+
+    <h1>Game Recommender</h1> 
     <a href="{{ url_for('logout') }}">Logout</a>
+    <br>
+    <iframe src="https://giphy.com/embed/S5uMJDmtnATLbjjw3h" width="432" height="480" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/S5uMJDmtnATLbjjw3h">via GIPHY</a></p>    {% if 'loggedin' in session %}
     <a href="{{ url_for('favorites') }}">My Favorites</a>
+    {% if message %}
+    <p>{{ message }}</p>
+    {% endif %}
+   
     {% else %}
     <a href="{{ url_for('login') }}">Login</a>
     {% endif %}
@@ -51,7 +57,7 @@
         <br>
         <br>
         <label for="user_score">User Score Threshold:</label>
-        <input type="number" name="user_score" id="user_score" min="0" max="100" step="0.1" placeholder="Enter the minimum user score">
+        <input type="number" name="user_score" id="user_score" min="0" max="10" step="0.1" placeholder="Enter the minimum user score" required>
         <br>
 
         <!-- Hidden input field for selected platform -->
