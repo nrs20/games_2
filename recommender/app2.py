@@ -149,16 +149,46 @@ def index():
         return render_template("index.html")
 
 def fetch_game_info(game_slug):
-    api_key = "33b676f49ef74f21860f648158668b42"
-    game_slug = game_slug.lower().replace(" ", "-").replace("'", "").replace(".", "").replace(":", "")
-    url = f"https://api.rawg.io/api/games/{game_slug}?key={api_key}"
-
+    api_key = "AIzaSyBUhOXZisi-abYLQ480sGFGwfgK7R9r8oU"
+    custom_search_engine_id = "d5d4e51a640c64644"
+    rawg_api_key = "33b676f49ef74f21860f648158668b42"
+    game_slug_lower = game_slug.lower().replace(" ", "-").replace("'", "").replace(".", "").replace(":", "")
+    
+    # Check the RAWG API for game data
+    rawg_url = f"https://api.rawg.io/api/games/{game_slug_lower}?key={rawg_api_key}"
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        game_data = response.json()
+        rawg_response = requests.get(rawg_url)
+        rawg_response.raise_for_status()
+        game_data = rawg_response.json()
 
-        if game_data:
+        if not game_data.get("background_image"):
+            # No photo found, use Google Custom Search API to look up the game_slug
+            google_search_url = f"https://www.googleapis.com/customsearch/v1?key={api_key}&cx={custom_search_engine_id}&q={game_slug_lower}"
+            
+            try:
+                google_response = requests.get(google_search_url)
+                google_response.raise_for_status()
+                google_data = google_response.json()
+                
+                if "items" in google_data and len(google_data["items"]) > 0:
+                    # Extract the first og:image value from the first item's metatags
+                    first_item = google_data["items"][0]
+                    metatags = first_item.get("pagemap", {}).get("metatags", [])
+                    first_metatag = metatags[0] if metatags else {}
+                    photo = first_metatag.get("og:image", None)
+                else:
+                    photo = None
+                
+                return None, [], None, [], photo, None  # Return None for other values
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching game info from Google: {e}")
+                return None, [], None, [], None, None
+            except ValueError as e:
+                print(f"Error parsing game info from Google: {e}")
+                return None, [], None, [], None, None
+                
+        else:
+            # Photo found, continue with the RAWG API data
             reddit_url = game_data.get("reddit_url", None)
             developers = game_data.get("developers", [])
             meta = game_data.get("metacritic_url", None)
@@ -175,17 +205,13 @@ def fetch_game_info(game_slug):
 
             developer_names = [developer["name"] for developer in developers]
             return reddit_url, developer_names, meta, stores, photo, website  # Include stores information
-        else:
-            return None, [], None, []  # Return None for all values when no game data is found
-
+        
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching game info: {e}")
-        return None, [], None, []
+        print(f"Error fetching game info from RAWG: {e}")
+        return None, [], None, [], None, None
     except ValueError as e:
-        print(f"Error parsing game info: {e}")
-        return None, [], None, []
-
-
+        print(f"Error parsing game info from RAWG: {e}")
+        return None, [], None, [], None, None
 
 def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
     # Implement your recommendation logic based on user input
@@ -319,7 +345,40 @@ def save_game():
     else:
         # Return an empty response (status code 401) to indicate that the user is not logged in
         return '', 401
+def publisher_info():
+    dictionary = {'electronic-arts': 'Electronic Arts', 'square-enix': 'Square Enix', 'microsoft-studios': 'Microsoft Studios', 'ubisoft-entertainment': 'Ubisoft Entertainment', 'sega-2': 'SEGA', '2k-games': '2K Games', 'bethesda-softworks': 'Bethesda Softworks', 'feral-interactive': 'Feral Interactive', 'capcom': 'Capcom', 'valve': 'Valve', 'sony-computer-entertainment': 'Sony Computer Entertainment', 'warner-bros-interactive': 'Warner Bros. Interactive', 'thq-nordic': 'THQ Nordic', 'devolver-digital': 'Devolver Digital', 'activision-blizzard': 'Activision Blizzard', 'aspyr': 'Aspyr', 'bandai-namco-entertainment': 'Bandai Namco Entertainment', 'deep-silver': 'Deep Silver', 'nintendo': 'Nintendo', 'rockstar-games': 'Rockstar Games', 'sony-interactive-entertainment': 'Sony Interactive Entertainment', '505-games': '505 Games', 'paradox-interactive': 'Paradox Interactive', 'telltale-games': 'Telltale Games', 'thq': 'THQ', 'activison': 'Activison', 'team17-digital-ltd': 'Team17 Digital', 'focus-home-interactive': 'Focus Home Interactive', 'konami': 'Konami', '1c-softclub': '1C-SoftClub', 'bandai-namco-entertainment-us': 'BANDAI NAMCO Entertainment US', 'disney-interactive': 'Disney Interactive', 'codemasters': 'Codemasters', 'daedalic-entertainment': 'Daedalic Entertainment', 'lucasarts-entertainment': 'LucasArts Entertainment', 'plug-in-digital-2': 'Plug In Digital', 'cd-projekt-red': 'CD PROJEKT RED', 'kiss-ltd': 'Kiss', 'xbox-game-studios': 'Xbox Game Studios', '1c-company': '1C Company', 'eidos-interactive': 'Eidos Interactive', 'curve-digital': 'Curve Digital', 'double-fine-productions': 'Double Fine Productions', 'atari': 'Atari', 'tinybuild': 'tinyBuild', 'annapurna-interactive': 'Annapurna Interactive', 'buka-entertainment': 'Buka Entertainment', 'take-two-interactive': 'Take Two Interactive', 'kalypso-media': 'Kalypso Media', 'atlus': 'Atlus', 'headup-games': 'Headup Games', 'ghi-media-llc': 'GHI Media', 'fromsoftware': 'FromSoftware', 'klei-entertainment': 'Klei Entertainment', 'interplay-productions': 'Interplay Productions', 'nightdive-studios': 'Nightdive Studios', 'activision-value-publishing': 'Activision Value Publishing', 'koch-media': 'Koch Media', 'id-software': 'id Software', 'raw-fury': 'Raw Fury', 'frictional-games': 'Frictional Games', 'microids-2': 'Microids', '11-bit-studios': '11 bit studios', 'bohemia-interactive': 'Bohemia Interactive', 'blizzard-entertainment': 'Blizzard Entertainment', 'strategy-first': 'Strategy First', 'iceberg-interactive': 'Iceberg Interactive', 'forever-entertainment-s-a': 'Forever Entertainment', 'playstation-pc-llc': 'PlayStation PC', '3d-realms': '3D Realms', 'konami-digital-entertainment-us': 'Konami Digital Entertainment-US', 'tripwire-interactive': 'Tripwire Interactive', 'gt-interactive-software': 'GT Interactive Software', 'majesco-entertainment': 'Majesco Entertainment', 'rebellion': 'Rebellion', 'quantic-dream': 'Quantic Dream', 'supergiant-games': 'Supergiant Games', 'chucklefish': 'Chucklefish', 'nvidia': 'NVIDIA', 'perfect-world-entertainment': 'Perfect World Entertainment', 'back-to-basics-gaming': 'Back To Basics Gaming', 'coffee-stain-studios': 'Coffee Stain Studios', 'topware-interactive-2': 'TopWare Interactive', 'playway': 'PlayWay', 'sekai-project': 'Sekai Project', 'good-shepherd-entertainment': 'Good Shepherd Entertainment', 'playdigious': 'Playdigious', 'anuman-interactive': 'Anuman Interactive', 'square': 'Square', 'playstation-mobile-inc': 'PlayStation Mobile', 'sierra-entertainment': 'Sierra Entertainment', 'techland-publishing': 'Techland Publishing', 'gearbox-publishing': 'Gearbox Publishing', 'nicalis': 'Nicalis', 'nordic-games': 'Nordic Games', 'koei-tecmo-games': 'Koei Tecmo Games', 'stardock-entertainment': 'Stardock Entertainment', 'adult-swim-games': 'Adult Swim Games', 'funbox-media': 'Funbox Media', 'sierra-on-line': 'Sierra On-Line', 'versus-evil': 'Versus Evil', 'fellow-traveller': 'Fellow Traveller', 'merge-games': 'Merge Games', 'dotemu': 'DotEmu', 'virgin-interactive': 'Virgin Interactive', 'humble-bundle': 'Humble Bundle', 'grabthegames': 'GrabTheGames', 'meridian4': 'Meridian4', 'infogrames': 'Infogrames', 'jackbox-games': 'Jackbox Games', 'snk': 'SNK', 'vivendi-universal-games': 'Vivendi Universal Games', 'larian-studios': 'Larian Studios', 'akella': 'Akella', 'bandai-namco-entertainment-europe': 'BANDAI NAMCO Entertainment Europe', 'xseed-games': 'XSEED Games', 'agm-playism': 'AGM PLAYISM', 'wwwhandy-gamescom': 'www.handy-games.com', 'new-reality-games': 'New Reality Games', 'degica': 'Degica', 'alawar-entertainment': 'Alawar Entertainment', 'bloober-team': 'Bloober Team', 'gt-interactive': 'GT Interactive', 'ci-games': 'CI Games', 'bungie': 'Bungie', 'frozenbyte': 'Frozenbyte', 'digerati': 'Digerati', 'gsc-game-world': 'GSC Game World', 'handygames': 'HandyGames', 'introversion-software': 'Introversion Software', 'sometimes-you': 'Sometimes You', 'artifex-mundi': 'Artifex Mundi', 'aksys-games': 'Aksys Games', 'virgin-interactive-entertainment': 'Virgin Interactive Entertainment', 'hi-rez-studios': 'Hi-Rez Studios', 'fatshark': 'Fatshark', 'viva-meda': 'Viva Meda', 'humble-games': 'Humble Games', 'drinkbox-studios': 'DrinkBox Studios', 'surprise-attack': 'Surprise Attack', 'bigben-interactive': 'Bigben Interactive', 'asmodee-digital': 'Asmodee Digital', 'blitworks': 'BlitWorks', 'cyberfront': 'CyberFront', 'oddworld-inhabitants': 'Oddworld Inhabitants', 'frogwares': 'Frogwares', 'hypetrain-digital': 'HypeTrain Digital', 'xd-network': 'X.D. Network', 'daybreak-game-company': 'Daybreak Game Company', 'digerati-distribution': 'Digerati Distribution', 'private-division': 'Private Division', 'alawar-premium': 'Alawar Premium', 'gameloft': 'Gameloft', 'frontier-developments': 'Frontier Developments', 'amanita-design': 'Amanita Design', 'retroism': 'Retroism', 'namco': 'Namco', 'zachtronics': 'Zachtronics', 'd3publisher': 'D3 Publisher', '8-4': '8-4', 'funcom': 'Funcom', 'nis-america': 'NIS America', 'marvelous-usa': 'Marvelous USA', 'microsoft-game-studios': 'Microsoft Game Studios', 'digital-extremes': 'Digital Extremes', 'spike-chunsoft-co-ltd': 'Spike Chunsoft Co', 'skybound-games': 'Skybound Games', 'trion-worlds': 'Trion Worlds', 'atlus-usa-2': 'Atlus USA', 'fishlabs': 'FISHLABS', 'empire-interactive': 'Empire Interactive', 'apogee-software': 'Apogee Software', 'winged-cloud': 'Winged Cloud', 'wargaming': 'Wargaming', 'running-with-scissors': 'Running With Scissors', 'missing-link-games': 'Missing Link Games', 'spike-chunsoft': 'Spike Chunsoft', 'nacon': 'Nacon', 'gaijin-entertainment': 'Gaijin Entertainment', 'acclaim-entertainment': 'Acclaim Entertainment', 'remedy-entertainment': 'Remedy Entertainment', 'wb-games': 'WB Games', 'assemble-entertainment': 'Assemble Entertainment', 'psyonix': 'Psyonix', 'io-interactive': 'Io-Interactive', 'bossa-studios': 'Bossa Studios', 'ak-tronic-software-services': 'ak tronic Software & Services', 'arc-system-works': 'Arc System Works', 'freebird-games': 'Freebird Games', 'revolution-software': 'Revolution Software', 'inxile-entertainment': 'inXile Entertainment', 'taleworlds-entertainment': 'TaleWorlds Entertainment', 'ensenasoft': 'EnsenaSoft', 'croteam': 'Croteam', 'playdead': 'Playdead', '4eversgames': '4EversGames', 'ea-sports': 'EA SPORTS', 'landfall': 'Landfall', 'modus-games': 'Modus Games', 'nordic-games-publishing': 'Nordic Games Publishing'}
+    return dictionary
+def developer_info():
+    dev_dict = {'ubisoft': 'Ubisoft', 'feral-interactive': 'Feral Interactive', 'valve-software': 'Valve Software', 'ubisoft-montreal': 'Ubisoft Montreal', 'electronic-arts': 'Electronic Arts', 'sony-interactive-entertainment': 'Sony Interactive Entertainment', 'square-enix': 'Square Enix', 'capcom': 'Capcom', 'aspyr-media': 'Aspyr Media', 'bethesda-softworks': 'Bethesda Softworks', 'sega': 'SEGA', 'warner-bros-interactive': 'Warner Bros. Interactive', 'bandai-namco-entertainment-america-inc': 'BANDAI NAMCO Entertainment America', 'devolver-digital': 'Devolver Digital', 'capcom-usa-inc': 'Capcom U.S.A', 'telltale-games': 'Telltale Games', 'thq-nordic': 'THQ Nordic', '2k': '2K', 'id-software': 'id Software', 'nvidia-lightspeed-studios': 'NVIDIA Lightspeed Studios', 'gearbox-software': 'Gearbox Software', 'bioware': 'BioWare', 'nintendo': 'Nintendo', 'konami-digital-entertainment': 'Konami Digital Entertainment', 'raven-software': 'Raven Software', 'naughty-dog': 'Naughty Dog', 'rockstar-north': 'Rockstar North', 'cd-projekt-red': 'CD PROJEKT RED', 'bethesda-game-studios': 'Bethesda Game Studios', 'digital-extremes': 'Digital Extremes', 'codemasters': 'Codemasters', 'ea-dice': 'Electronic Arts DICE', 'rockstar-games': 'Rockstar Games', 'team17-digital': 'Team17 Digital', 'crystal-dynamics': 'Crystal Dynamics', '505-games': '505 Games', 'deep-silver': 'Deep Silver', 'daedalic-entertainment': 'Daedalic Entertainment', 'io-interactive-2': 'IO Interactive', 'fromsoftware': 'FromSoftware', 'double-fine-productions': 'Double Fine Productions', 'arkane-studios': 'Arkane Studios', 'activision': 'Activision', 'travellers-tales': "Traveller's Tales", 'relic-entertainment': 'Relic Entertainment', 'firaxis': 'Firaxis', 'lucasarts-entertainment': 'LucasArts Entertainment', 'volition': 'Volition', 'plug-in-digital': 'Plug In Digital', '2k-australia': '2K Australia', 'obsidian-entertainment': 'Obsidian Entertainment', 'turtle-rock-studios': 'Turtle Rock Studios', 'treyarch': 'Treyarch', 'bandai-namco-entertainment': 'Bandai Namco Entertainment', '2k-marin': '2K Marin', 'ubisoft-toronto': 'Ubisoft Toronto', 'panic-button': 'Panic Button', 'lucasfilm': 'Lucasfilm', 'creative-assembly': 'Creative Assembly', 'croteam': 'Croteam', 'remedy-entertainment': 'Remedy Entertainment', 'techland': 'Techland', 'ubisoft-montpellier': 'Ubisoft Montpellier', 'avalanche-studios': 'Avalanche Studios', 'monolith-productions': 'Monolith Productions', 'epic-games': 'Epic Games', 'dontnod-entertainment': 'DONTNOD Entertainment', 'virtuos': 'Virtuos', 'insomniac-games': 'Insomniac Games', 'infinity-ward': 'Infinity Ward', 'eidos-montreal': 'Eidos Montreal', 'nerve-software': 'Nerve Software', 'curve-digital': 'Curve Digital', 'tinybuild': 'tinyBuild', 'klei-entertainment': 'Klei Entertainment', 'ubisoft-shanghai-2': 'Ubisoft Shanghai', 'netherrealm-studios': 'NetherRealm Studios', 'beenox': 'Beenox', 'vicarious-visions': 'Vicarious Visions', 'thq': 'THQ', 'crytek': 'Crytek', '2k-china': '2K China', 'ea-canada': 'Electronic Arts Canada', 'platinumgames': 'Platinum Games', 'respawn-entertainment': 'Respawn Entertainment', 'bungie-inc': 'Bungie', '4a-games': '4A Games', 'qloc': 'QLOC', 'high-voltage-software': 'High Voltage Software', 'rocksteady-studios': 'Rocksteady Studios', 'frozenbyte': 'Frozenbyte', 'rebellion': 'Rebellion', 'kojima-productions': 'Kojima Productions', '11-bit-studios': '11 Bit Studios', 'quantic-dream': 'Quantic Dream', 'irrational-games': 'Irrational Games', 'microids': 'Microids', 'paradox-development-studio': 'Paradox Development Studio', '3d-realms': '3D Realms', 'frictional-games': 'Frictional Games', 'sledgehammer-games': 'Sledgehammer Games', 'supergiant-games': 'Supergiant Games', 'haemimont-games': 'Haemimont Games', 'ubisoft-quebec': 'Ubisoft Quebec', 'double-eleven': 'Double Eleven', 'annapurna-interactive': 'Annapurna Interactive', 'dotemu': 'DotEmu', 'bohemia-interactive': 'Bohemia Interactive', 'splash-damage': 'Splash Damage', 'tango-gameworks': 'Tango Gameworks', 'ryu-ga-gotoku-studio': 'Ryu ga Gotoku Studio', 'sumo-digital': 'Sumo Digital', 'atlus': 'Atlus', 'criterion-games': 'Criterion Games', 'saber-interactive': 'Saber Interactive', 'ubisoft-bucharest': 'Ubisoft Bucharest', '343-industries': '343 Industries', 'koei-tecmo': 'Koei Tecmo', 'handy-games': 'Handy Games', 'sonic-team': 'Sonic Team', 'rare': 'Rare', 'playdigious': 'Playdigious', '8-4': '8-4', 'guerrilla-games': 'Guerrilla Games', 'triumph-studios': 'Triumph Studios', 'paradox-interactive': 'Paradox Interactive', 'high-moon-studios': 'High Moon Studios', 'piranha-bytes': 'Piranha Bytes', 'focus-home-interactive': 'Focus Home Interactive', 'arc-system-works': 'Arc System Works', 'square': 'Square', 'anuman-interactive': 'Anuman Interactive', 'hi-rez-studios': 'Hi-Rez Studios', 'popcap-games': 'PopCap Games', 'machine-games': 'Machine Games', 'gsc-game-world': 'GSC Game World', 'sucker-punch-productions': 'Sucker Punch Productions', 'snk': 'SNK', 'stardock-entertainment': 'Stardock Entertainment', 'abstraction-games': 'Abstraction Games', 'jackbox-games': 'Jackbox Games', 'tripwire-interactive': 'Tripwire Interactive', 'kalypso-media': 'Kalypso Media', 'vigil-games': 'Vigil Games', 'larian-studios': 'Larian Studios', 'cyanide-studio': 'Cyanide Studio', 'playground-games': 'Playground Games', 'flying-wild-hog': 'Flying Wild Hog', 'cd-projekt-sa': 'CD PROJEKT', 'gameloft': 'Gameloft', 'frontier-developments': 'Frontier Developments', 'alawar-entertainment': 'Alawar Entertainment', 'war-drum-studios': 'War Drum Studios', 'frogwares': 'Frogwares', 'visceral-games': 'Visceral Games', 'bloober-team-sa': 'Bloober Team', 'hangar-13': 'Hangar 13', 'nicalis': 'Nicalis', 'microprose-software': 'MicroProse Software', 'amplitude-studios': 'Amplitude Studios', 'visual-concepts': 'Visual Concepts', 'armature-studio': 'Armature Studio', 'fatshark': 'Fatshark', '2k-czech': '2K Czech', 'escalation-studios': 'Escalation Studios', 'edge-of-reality': 'Edge of Reality', 'coffee-stain-studios': 'Coffee Stain Studios', 'headup-games': 'Headup Games', 'dennaton-games': 'Dennaton Games', 'introversion-software': 'Introversion Software', 'engine-software': 'Engine Software', 'n-space': 'n-Space', 'starbreeze-studios': 'Starbreeze Studios', 'grasshopper-manufacture': 'Grasshopper Manufacture', 'rockstar-san-diego': 'Rockstar San Diego', 'playdead': 'Playdead', 'hidden-path-entertainment': 'Hidden Path Entertainment', 'maxis': 'Maxis', 'ubisoft-kiev': 'Ubisoft Kiev', 'supermassive-games': 'Supermassive Games', 'arrowhead-game-studios': 'Arrowhead Game Studios', 'sony-computer-entertainment-america': 'Sony Computer Entertainment America', 'spike-chunsoft': 'Spike Chunsoft', 'santa-monica-studio': 'Santa Monica Studio', 'interplay-entertainment': 'Interplay Entertainment', 'sce-santa-monica-studio': 'SCE Santa Monica Studio', 'red-storm': 'Red Storm', 'team-ninja': 'Team NINJA', 'certain-affinity': 'Certain Affinity', 'codeglue': 'Codeglue', 'wayforward-technologies': 'WayForward Technologies', 'oddworld-inhabitants': 'Oddworld Inhabitants', 'lionhead-studios': 'Lionhead Studios', 'ninja-theory': 'Ninja Theory', 'ubisoft-annecy': 'Ubisoft Annecy', 'game-freak': 'Game Freak', 'ubisoft-paris': 'Ubisoft Paris', 'asobo-studio': 'Asobo Studio', 'people-can-fly': 'People Can Fly', 'gunfire-games': 'Gunfire Games'}
+    return dev_dict
+@app.route('/developers')
+def developers():
+    developer_dictionary = developer_info()
 
+    selected_developer = request.args.get('selected_developer')  # Retrieve from query parameters
+
+    if selected_developer:  # Check if the parameter is present
+        api_key = '33b676f49ef74f21860f648158668b42'
+        url = f'https://api.rawg.io/api/games?key={api_key}&developers={selected_developer}&ordering=-rating&page_size=10'
+        modified_value = selected_developer.replace('-', ' ').title()  # Replace hyphens with spaces
+        
+        response = requests.get(url)
+        games_data = response.json()
+
+        return render_template('games.html', games=games_data['results'], selected=modified_value)
+
+    return render_template('developers.html', developer_dictionary=developer_dictionary)
+
+@app.route('/get_games', methods=['POST'])
+def get_games():
+    developer = request.form['developer']
+    api_key = '33b676f49ef74f21860f648158668b42'
+    url = f'https://api.rawg.io/api/games?key={api_key}&developers={developer}&ordering=-rating&page_size=10'
+    
+    response = requests.get(url)
+    games_data = response.json()
+
+    return render_template('games.html', games=games_data['results'])
 import ast
 @app.route('/favorites', endpoint='favorites', methods=['GET', 'POST'])
 def show_favorites():
@@ -477,6 +536,31 @@ def remove_from_favorites():
             return redirect(url_for('favorites'))
     else:
         return redirect(url_for('login'))  # Redirect to the login page if not logged in
+@app.route('/redirect_to_home')
+def redirect_to_home():
+    # Call the clear_game_info function
+    clear_game_info()
+
+    # Redirect to the home page
+    return redirect(url_for('index'))
+
+#new
+@app.route('/developer_search', methods=['GET'])
+def developer_search():
+    return render_template('developer_search.html')
+@app.route('/fetch_developer_slugs', methods=['GET'])
+def fetch_developer_slugs():
+    # Make a request to the RAWG API to fetch a list of developer slugs
+    rawg_api_key = "33b676f49ef74f21860f648158668b42"
+    url = f"https://api.rawg.io/api/developers?key={rawg_api_key}&page_size=100"
+
+    response = requests.get(url)
+    data = response.json()
+
+    developer_slugs = [developer.get('slug', 'Unknown') for developer in data.get('results', [])]
+
+    return jsonify({'developer_slugs': developer_slugs})
+#end of new
 
 @app.route('/clear_game_info')
 def clear_game_info():
@@ -500,14 +584,19 @@ def clear_game_info():
         # Convert the new_game_info dictionary to JSON format
         new_game_info_json = json.dumps(new_game_info)
 
+        # Update the 'favorites' column in the database with the modified favorites_list
+        cursor.execute('UPDATE user SET favorite_games = %s WHERE email = %s', (session['game_info'], session['email']))
+        
         # Update the 'game_info' column in the database with the JSON string
-        cursor.execute('UPDATE user SET game_info = %s WHERE email = %s', (new_game_info_json, session['email'],))
+        cursor.execute('UPDATE user SET game_info = %s WHERE email = %s', (new_game_info_json, session['email']))
+        
         mysql.connection.commit()
 
         print("After removing non-favorite games from game_info:", session['game_info'])
     else:
         print("'game_info' not found in the session.")
     return 'game_info session cleared!'
+
 
 
     
