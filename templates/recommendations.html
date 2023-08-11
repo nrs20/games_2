@@ -4,7 +4,50 @@
     <title>Recommended Games</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
     <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+    <style>
+        .navbar {
+            background-color: #333;
+            overflow: hidden;
+        }
 
+        .navbar a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+        }
+
+        .navbar a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+        .recommended-game-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .recommended-game {
+            width: calc(50% - 10px);
+            margin-bottom: 20px;
+            /* Other styles for individual game elements */
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="/" {% if current_route == '/' %}class="active"{% endif %}>Home</a>
+        <a href="/favorites" {% if current_route == '/favorites' %}class="active"{% endif %}>My Favorites</a>
+        <a href="/developers" {% if current_route == '/developers' %}class="active"{% endif %}>Developer</a>
+        <a href="/bookmarked_games" {% if current_route == '/bookmarked_games' %}class="active"{% endif %}> Bookmarked Games</a>
+        {% if message %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+        {% endif %}
+    </div>
 </head>
 <body>
     <!-- Add a dropdown to filter games -->
@@ -33,10 +76,11 @@
     <h1>Recommended Games</h1>
     <h2>Game Information:</h2>
     <ul>
-        {% for game in games %}
-        <li class="{% if game_info[game.Genre|join(", ")][game.Name]["reddit_url"] is none or game_info[game.Genre|join(", ")][game.Name]["reddit_url"] == "" %}
-        {# Code to execute if the reddit_url is equal to None or an empty string #}
-    no-reddit{% endif %}">
+        <div class="recommended-game-container">
+            {% for game in games %}
+            <div class="recommended-game {% if game_info[game.Genre|join(', ')][game.Name]['reddit_url'] is none or game_info[game.Genre|join(', ')][game.Name]['reddit_url'] == '' %}no-reddit{% endif %}">
+                {# Code to execute if the reddit_url is equal to None or an empty string #}
+
             <a href="https://www.google.com/search?q={{ game.Name }}" target="_blank">{{ game.Name }}</a>
             {% if 'loggedin' in session and session['loggedin'] %}
             <form onsubmit="return saveGame('{{ game.Name }}')">
@@ -44,7 +88,7 @@
                 <button type="submit">Save</button>
             </form>
             {% endif %}
-            {% if 'photo' in game_info[game.Genre|join(", ")][game.Name] %}
+            {% if 'photo' in game_info[game.Genre|join(", ")][game.Name] and game_info[game.Genre|join(", ")][game.Name]['photo'] != 'None' %}
             <img src="{{ game_info[game.Genre|join(", ")][game.Name]['photo'] }}"
             alt="{{ game.Name }} Photo"
             width="400" 
@@ -52,8 +96,11 @@
        >
             {% else %}
             <!-- Display a default image or placeholder if no photo available -->
-            <p> No image available </p>
-            {% endif %}
+            <img src="static/random.jpeg"
+            alt="Controller Photo"
+            width="400" 
+            height="300">
+                        {% endif %}
 
             <br>
             Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{ game.Platform|replace("[", "")|replace("]", "")|replace("'", " ") }}
@@ -116,11 +163,15 @@
                 {% for developer_name in game.Developers %}
                 <li>{{ developer_name }}</li>
                 {% endfor %}
+
             </ul>
 
             
         </li>
+    </div>
         {% endfor %}
+    </div>
+
     </ul>
 
     <button onclick="regenerateGames()">Regenerate</button>

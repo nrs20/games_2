@@ -3,23 +3,61 @@
 <head>
     <title>Game Recommender</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
-    <link rel="icon" type="image/x-icon" href="images/pink.jpeg"/>
+    <link rel="icon" type="image/x-icon" href="static/favicon.jpeg"/>
+    <style>
+        .navbar {
+            background-color: #333;
+            overflow: hidden;
+        }
 
+        .navbar a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+        }
+
+        .navbar a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+
+        /* Apply the active style */
+        .navbar a.active {
+            background-color: #555;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-
+    <div class="navbar">
+        <a href="/" {% if current_route == '/' %}class="active"{% endif %}>Home</a>
+        <a href="/favorites" {% if current_route == '/favorites' %}class="active"{% endif %}>My Favorites</a>
+        <a href="/developers" {% if current_route == '/developers' %}class="active"{% endif %}>Developer</a>
+        <a href="/bookmarked_games" {% if current_route == '/bookmarked_games' %}class="active"{% endif %}> Bookmarked Games</a>
+        {% if message %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+      <a href="{{ url_for('login') }}">Login</a>
+      {% endif %}
+    </div>
+        
     <h1>Game Recommender</h1> 
-    <a href="{{ url_for('logout') }}">Logout</a>
     <br>
+  
     <iframe src="https://giphy.com/embed/S5uMJDmtnATLbjjw3h" width="432" height="480" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/S5uMJDmtnATLbjjw3h">via GIPHY</a></p>    {% if 'loggedin' in session %}
-    <a href="{{ url_for('favorites') }}">My Favorites</a>
     {% if message %}
-    <p>{{ message }}</p>
+
+    <p>{{ message }}</p>  
+
     {% endif %}
    
     {% else %}
-    <a href="{{ url_for('login') }}">Login</a>
+    <p> Welcome! </p>
     {% endif %}
+
     <form method="post" action="/recommend">
         <label for="genre">Genre:</label>
         <select name="genre" id="genre">
