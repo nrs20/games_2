@@ -4,18 +4,11 @@ import pandas as pd
 import numpy as np
 import requests
 import re
-from flask import copy_current_request_context
 import json
-import urllib.parse
 from datetime import timedelta 
-from bs4 import BeautifulSoup
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Email, EqualTo
 from flask_bcrypt import Bcrypt, check_password_hash
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
-from flask_paginate import Pagination, get_page_args
 
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
@@ -141,12 +134,16 @@ def register():
 
 @app.route("/")
 def index():
+    current_route = request.path
     # Display welcome message if user is logged in
     if 'loggedin' in session:
         message = f'Welcome, {session["name"]}!'
-        return render_template("index.html", message=message)
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('UPDATE user SET developed_dict = %s WHERE email = %s', ('{}', session['email']))
+        mysql.connection.commit() 
+        return render_template("index.html", message=message, current_route=current_route)
     else:
-        return render_template("index.html")
+        return render_template("index.html", current_route=current_route)
 
 def fetch_game_info(game_slug):
     api_key = "AIzaSyBUhOXZisi-abYLQ480sGFGwfgK7R9r8oU"
@@ -176,6 +173,7 @@ def fetch_game_info(game_slug):
                     metatags = first_item.get("pagemap", {}).get("metatags", [])
                     first_metatag = metatags[0] if metatags else {}
                     photo = first_metatag.get("og:image", None)
+                    print("WE GOT HIM", photo)
                 else:
                     photo = None
                 
@@ -286,6 +284,8 @@ def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
 # Route to handle the initial recommendation request
 @app.route("/recommend", methods=["POST"])
 def recommend_games():
+    logged_in = 'loggedin' in session
+    message = f'Hello, {session["name"]}!' if logged_in and 'name' in session else None    
     genre = request.form.get("genre")
     platform = request.form.get("platform")
     user_score_threshold = float(request.form.get("user_score"))
@@ -295,7 +295,7 @@ def recommend_games():
     game_info = session.get("game_info", {})
     print("GAME INGO IN RECOMMEND", game_info)
     #print("THIS IS GAMES", games)
-    return render_template("recommendations.html", games=session["recommended_games"], game_info=game_info)
+    return render_template("recommendations.html", games=session["recommended_games"], game_info=game_info, message= message, logged_in=logged_in)
 
 # Route to handle the regenerate button click
 @app.route("/regenerate", methods=["POST"])
@@ -312,6 +312,164 @@ def regenerate_games():
         game_info[genre] = dict(random.sample(game_info[genre].items(), len(game_info[genre])))
 
     return jsonify({"status": "success"}), 200
+def get_game_info_by_name(game_name, diction):
+    for game in diction:
+        if game['name'] == game_name:
+            game_info = {
+                "Game Name": game['name'],
+                "Rating": game['rating'],
+                "Background Image URL": game['background_image'],
+                "Metacritic": game['metacritic']
+                # Add other relevant information as needed
+            }
+            return game_info
+    return None
+@app.route('/delete_bookmarked_games', methods=['POST'])
+def delete_bookmarked_games():
+    if 'loggedin' in session and session['loggedin']:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('UPDATE user SET bookmarked_games = %s WHERE email = %s', (json.dumps([]), session['email']))
+        mysql.connection.commit()
+        
+        # Return an empty response (status code 200) to indicate success
+        return '', 200
+    else:
+        # Return an empty response (status code 401) to indicate that the user is not logged in
+        return '', 401
+
+@app.route('/bookmark_game', methods=['POST'])
+def bookmark_game():
+    print("hi")
+    
+    if 'loggedin' in session and session['loggedin']:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT developed_dict FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
+        
+        if user and 'developed_dict' in user:
+            all_games_info_json = user['developed_dict']
+            print("THIS IS JSON", all_games_info_json)
+            all_games_info = json.loads(all_games_info_json)
+            
+            # Get the name of the game from the form data
+            game_name = request.form.get('game_name')
+            print("This is game_name", game_name)
+            
+            # Find the game information in all_games_info based on game_name
+            bookmarked_game_info = get_game_info_by_name(game_name, all_games_info)
+
+            print("Bookmarked game here!!", bookmarked_game_info)
+            
+            if bookmarked_game_info:
+                # Update the user's bookmarks list in the database
+                cursor.execute('SELECT developers, bookmarked_games FROM user WHERE email = %s', (session['email'],))
+                user = cursor.fetchone()
+                bookmarks_list_str = user.get('developers') if user else ''
+                bookmarks_list = bookmarks_list_str.split(',') if bookmarks_list_str else []
+                
+                if game_name not in bookmarks_list:
+                    bookmarks_list.append(game_name)
+                    print("BOOKMARKS_LIST BELOW")
+                    print(bookmarks_list)
+                    
+                    # Update the user's bookmarks list in the database
+                    bookmarks_list_str = ','.join(bookmarks_list)
+                    cursor.execute('UPDATE user SET developers = %s WHERE email = %s', (bookmarks_list_str, session['email']))
+                    
+                    # Retrieve and update the bookmarked games list from the database
+                    bookmarked_games_list_str = user.get('bookmarked_games') if user else ''
+                    bookmarked_games_list = bookmarked_games_list_str.split('|') if bookmarked_games_list_str else []
+                    
+                    # Convert the bookmarked game's information dictionary to a delimited string
+                    delimited_info = ','.join([str(value) for value in bookmarked_game_info.values()])
+                    print("THIS IS DELIMITED INFO", delimited_info)
+                    
+                    # Append the new bookmarked game's delimited information to the list
+                    bookmarked_games_list.append(delimited_info)
+                    
+                    # Convert the list back to a delimited string and update the user's bookmarked games list in the database
+                    bookmarked_games_list_str = '|'.join(bookmarked_games_list)
+                    print("This is bookmarked_games_list_str", bookmarked_games_list_str)
+                    
+                    cursor.execute('UPDATE user SET bookmarked_games = %s WHERE email = %s', (bookmarked_games_list_str, session['email']))
+                    mysql.connection.commit()
+                    
+                    # Return an empty response (status code 200) to indicate success
+                    return '', 200
+                else:
+                    # Return an empty response (status code 200) to indicate the game is already bookmarked
+                    return '', 200
+            else:
+                # Return an empty response (status code 400) to indicate the game name wasn't found in all_games_info
+                return '', 400
+        else:
+            # Handle the case when developed_dict is not found in the user's record
+            return '', 400
+    else:
+        # Return an empty response (status code 401) to indicate that the user is not logged in
+        return '', 401
+
+@app.route('/remove_bookmarked_game/<game_name>', methods=['POST'])
+def remove_bookmarked_game(game_name):
+    print("HEHEEHEHE")
+    if 'loggedin' in session and session['loggedin']:
+        print("HSAHSAH")
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT bookmarked_games FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
+        bookmarked_games_list_str = user.get('bookmarked_games') if user else ''
+        print(bookmarked_games_list_str)
+        print(" ")
+        bookmarked_games_list = bookmarked_games_list_str.split('|') if bookmarked_games_list_str else []
+        print("BOOKMARKED GAMES LIST",bookmarked_games_list)
+        print(" BE FORE LOOP")
+        print(" ")
+        for game_info in bookmarked_games_list:
+            game_edited = game_info.split(',')[0]  # Extract the game name from the comma-separated string
+            if game_edited.strip() == game_name:        
+        #if game_name in bookmarked_games_list:
+                bookmarked_games_list.remove(game_info)  # Remove the selected game from the list
+                print("BREAK IN ")
+                print("REMOVED", bookmarked_games_list)
+            # Update the user's bookmarked games list in the database
+                updated_bookmarked_games_list_str = '|'.join(bookmarked_games_list)
+                cursor.execute('UPDATE user SET bookmarked_games = %s WHERE email = %s', (updated_bookmarked_games_list_str, session['email']))
+                mysql.connection.commit()
+        print("AFTER LOOP")
+        return redirect(url_for('show_bookmarked_games'))
+    else:
+        return redirect(url_for('login'))
+
+
+@app.route('/bookmarked_games', methods=['GET'])
+def show_bookmarked_games():
+    if 'loggedin' in session and session['loggedin']:
+        message = f'Welcome, {session["name"]}'
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT bookmarked_games FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
+        bookmarked_games_list_str = user.get('bookmarked_games') if user else ''
+        bookmarked_games_list = bookmarked_games_list_str.split('|') if bookmarked_games_list_str else []
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('UPDATE user SET developed_dict = %s WHERE email = %s', ('{}', session['email']))
+        mysql.connection.commit()        
+        return render_template('bookmarked_games.html', bookmarked_games_list=bookmarked_games_list, message = message)
+    else:
+        return redirect(url_for('login'))
+@app.route('/profile')
+def profile():
+    if 'loggedin' in session and session['loggedin']:
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('SELECT bookmarked_games FROM user WHERE email = %s', (session['email'],))
+        user = cursor.fetchone()
+        
+        bookmarked_games = user.get('bookmarked_games') if user else []
+        if bookmarked_games:
+            print(bookmarked_games)
+        
+        return render_template('profile.html', bookmarked_games=bookmarked_games)
+    else:
+        return redirect('/login')
 
 @app.route('/save_game', methods=['POST'])
 def save_game():
@@ -351,26 +509,65 @@ def publisher_info():
 def developer_info():
     dev_dict = {'ubisoft': 'Ubisoft', 'feral-interactive': 'Feral Interactive', 'valve-software': 'Valve Software', 'ubisoft-montreal': 'Ubisoft Montreal', 'electronic-arts': 'Electronic Arts', 'sony-interactive-entertainment': 'Sony Interactive Entertainment', 'square-enix': 'Square Enix', 'capcom': 'Capcom', 'aspyr-media': 'Aspyr Media', 'bethesda-softworks': 'Bethesda Softworks', 'sega': 'SEGA', 'warner-bros-interactive': 'Warner Bros. Interactive', 'bandai-namco-entertainment-america-inc': 'BANDAI NAMCO Entertainment America', 'devolver-digital': 'Devolver Digital', 'capcom-usa-inc': 'Capcom U.S.A', 'telltale-games': 'Telltale Games', 'thq-nordic': 'THQ Nordic', '2k': '2K', 'id-software': 'id Software', 'nvidia-lightspeed-studios': 'NVIDIA Lightspeed Studios', 'gearbox-software': 'Gearbox Software', 'bioware': 'BioWare', 'nintendo': 'Nintendo', 'konami-digital-entertainment': 'Konami Digital Entertainment', 'raven-software': 'Raven Software', 'naughty-dog': 'Naughty Dog', 'rockstar-north': 'Rockstar North', 'cd-projekt-red': 'CD PROJEKT RED', 'bethesda-game-studios': 'Bethesda Game Studios', 'digital-extremes': 'Digital Extremes', 'codemasters': 'Codemasters', 'ea-dice': 'Electronic Arts DICE', 'rockstar-games': 'Rockstar Games', 'team17-digital': 'Team17 Digital', 'crystal-dynamics': 'Crystal Dynamics', '505-games': '505 Games', 'deep-silver': 'Deep Silver', 'daedalic-entertainment': 'Daedalic Entertainment', 'io-interactive-2': 'IO Interactive', 'fromsoftware': 'FromSoftware', 'double-fine-productions': 'Double Fine Productions', 'arkane-studios': 'Arkane Studios', 'activision': 'Activision', 'travellers-tales': "Traveller's Tales", 'relic-entertainment': 'Relic Entertainment', 'firaxis': 'Firaxis', 'lucasarts-entertainment': 'LucasArts Entertainment', 'volition': 'Volition', 'plug-in-digital': 'Plug In Digital', '2k-australia': '2K Australia', 'obsidian-entertainment': 'Obsidian Entertainment', 'turtle-rock-studios': 'Turtle Rock Studios', 'treyarch': 'Treyarch', 'bandai-namco-entertainment': 'Bandai Namco Entertainment', '2k-marin': '2K Marin', 'ubisoft-toronto': 'Ubisoft Toronto', 'panic-button': 'Panic Button', 'lucasfilm': 'Lucasfilm', 'creative-assembly': 'Creative Assembly', 'croteam': 'Croteam', 'remedy-entertainment': 'Remedy Entertainment', 'techland': 'Techland', 'ubisoft-montpellier': 'Ubisoft Montpellier', 'avalanche-studios': 'Avalanche Studios', 'monolith-productions': 'Monolith Productions', 'epic-games': 'Epic Games', 'dontnod-entertainment': 'DONTNOD Entertainment', 'virtuos': 'Virtuos', 'insomniac-games': 'Insomniac Games', 'infinity-ward': 'Infinity Ward', 'eidos-montreal': 'Eidos Montreal', 'nerve-software': 'Nerve Software', 'curve-digital': 'Curve Digital', 'tinybuild': 'tinyBuild', 'klei-entertainment': 'Klei Entertainment', 'ubisoft-shanghai-2': 'Ubisoft Shanghai', 'netherrealm-studios': 'NetherRealm Studios', 'beenox': 'Beenox', 'vicarious-visions': 'Vicarious Visions', 'thq': 'THQ', 'crytek': 'Crytek', '2k-china': '2K China', 'ea-canada': 'Electronic Arts Canada', 'platinumgames': 'Platinum Games', 'respawn-entertainment': 'Respawn Entertainment', 'bungie-inc': 'Bungie', '4a-games': '4A Games', 'qloc': 'QLOC', 'high-voltage-software': 'High Voltage Software', 'rocksteady-studios': 'Rocksteady Studios', 'frozenbyte': 'Frozenbyte', 'rebellion': 'Rebellion', 'kojima-productions': 'Kojima Productions', '11-bit-studios': '11 Bit Studios', 'quantic-dream': 'Quantic Dream', 'irrational-games': 'Irrational Games', 'microids': 'Microids', 'paradox-development-studio': 'Paradox Development Studio', '3d-realms': '3D Realms', 'frictional-games': 'Frictional Games', 'sledgehammer-games': 'Sledgehammer Games', 'supergiant-games': 'Supergiant Games', 'haemimont-games': 'Haemimont Games', 'ubisoft-quebec': 'Ubisoft Quebec', 'double-eleven': 'Double Eleven', 'annapurna-interactive': 'Annapurna Interactive', 'dotemu': 'DotEmu', 'bohemia-interactive': 'Bohemia Interactive', 'splash-damage': 'Splash Damage', 'tango-gameworks': 'Tango Gameworks', 'ryu-ga-gotoku-studio': 'Ryu ga Gotoku Studio', 'sumo-digital': 'Sumo Digital', 'atlus': 'Atlus', 'criterion-games': 'Criterion Games', 'saber-interactive': 'Saber Interactive', 'ubisoft-bucharest': 'Ubisoft Bucharest', '343-industries': '343 Industries', 'koei-tecmo': 'Koei Tecmo', 'handy-games': 'Handy Games', 'sonic-team': 'Sonic Team', 'rare': 'Rare', 'playdigious': 'Playdigious', '8-4': '8-4', 'guerrilla-games': 'Guerrilla Games', 'triumph-studios': 'Triumph Studios', 'paradox-interactive': 'Paradox Interactive', 'high-moon-studios': 'High Moon Studios', 'piranha-bytes': 'Piranha Bytes', 'focus-home-interactive': 'Focus Home Interactive', 'arc-system-works': 'Arc System Works', 'square': 'Square', 'anuman-interactive': 'Anuman Interactive', 'hi-rez-studios': 'Hi-Rez Studios', 'popcap-games': 'PopCap Games', 'machine-games': 'Machine Games', 'gsc-game-world': 'GSC Game World', 'sucker-punch-productions': 'Sucker Punch Productions', 'snk': 'SNK', 'stardock-entertainment': 'Stardock Entertainment', 'abstraction-games': 'Abstraction Games', 'jackbox-games': 'Jackbox Games', 'tripwire-interactive': 'Tripwire Interactive', 'kalypso-media': 'Kalypso Media', 'vigil-games': 'Vigil Games', 'larian-studios': 'Larian Studios', 'cyanide-studio': 'Cyanide Studio', 'playground-games': 'Playground Games', 'flying-wild-hog': 'Flying Wild Hog', 'cd-projekt-sa': 'CD PROJEKT', 'gameloft': 'Gameloft', 'frontier-developments': 'Frontier Developments', 'alawar-entertainment': 'Alawar Entertainment', 'war-drum-studios': 'War Drum Studios', 'frogwares': 'Frogwares', 'visceral-games': 'Visceral Games', 'bloober-team-sa': 'Bloober Team', 'hangar-13': 'Hangar 13', 'nicalis': 'Nicalis', 'microprose-software': 'MicroProse Software', 'amplitude-studios': 'Amplitude Studios', 'visual-concepts': 'Visual Concepts', 'armature-studio': 'Armature Studio', 'fatshark': 'Fatshark', '2k-czech': '2K Czech', 'escalation-studios': 'Escalation Studios', 'edge-of-reality': 'Edge of Reality', 'coffee-stain-studios': 'Coffee Stain Studios', 'headup-games': 'Headup Games', 'dennaton-games': 'Dennaton Games', 'introversion-software': 'Introversion Software', 'engine-software': 'Engine Software', 'n-space': 'n-Space', 'starbreeze-studios': 'Starbreeze Studios', 'grasshopper-manufacture': 'Grasshopper Manufacture', 'rockstar-san-diego': 'Rockstar San Diego', 'playdead': 'Playdead', 'hidden-path-entertainment': 'Hidden Path Entertainment', 'maxis': 'Maxis', 'ubisoft-kiev': 'Ubisoft Kiev', 'supermassive-games': 'Supermassive Games', 'arrowhead-game-studios': 'Arrowhead Game Studios', 'sony-computer-entertainment-america': 'Sony Computer Entertainment America', 'spike-chunsoft': 'Spike Chunsoft', 'santa-monica-studio': 'Santa Monica Studio', 'interplay-entertainment': 'Interplay Entertainment', 'sce-santa-monica-studio': 'SCE Santa Monica Studio', 'red-storm': 'Red Storm', 'team-ninja': 'Team NINJA', 'certain-affinity': 'Certain Affinity', 'codeglue': 'Codeglue', 'wayforward-technologies': 'WayForward Technologies', 'oddworld-inhabitants': 'Oddworld Inhabitants', 'lionhead-studios': 'Lionhead Studios', 'ninja-theory': 'Ninja Theory', 'ubisoft-annecy': 'Ubisoft Annecy', 'game-freak': 'Game Freak', 'ubisoft-paris': 'Ubisoft Paris', 'asobo-studio': 'Asobo Studio', 'people-can-fly': 'People Can Fly', 'gunfire-games': 'Gunfire Games'}
     return dev_dict
+@app.route('/clear_games_info')
+def clear_all_games_info():
+    if 'all_games_info' in session:
+        session.pop('all_games_info', None)
+        print("AFTER POP", session['all_games_info'])
+    return redirect(url_for('index'))  # Redirect to another route, e.g., index
+
+#THIS IS WHERE THE COOKIE PROBLEM HAPPENS
 @app.route('/developers')
 def developers():
     developer_dictionary = developer_info()
+    logged_in = 'loggedin' in session
+    message = f'Hello, {session["name"]}!' if logged_in and 'name' in session else None
+    
+    selected_developer = request.args.get('selected_developer')
 
-    selected_developer = request.args.get('selected_developer')  # Retrieve from query parameters
-
-    if selected_developer:  # Check if the parameter is present
+    if selected_developer:
         api_key = '33b676f49ef74f21860f648158668b42'
         url = f'https://api.rawg.io/api/games?key={api_key}&developers={selected_developer}&ordering=-rating&page_size=10'
-        modified_value = selected_developer.replace('-', ' ').title()  # Replace hyphens with spaces
-        
+        modified_value = selected_developer.replace('-', ' ').title()
+
         response = requests.get(url)
         games_data = response.json()
+        if 'results' in games_data:
+            all_games_info = []  # Create an empty list to store game information
 
-        return render_template('games.html', games=games_data['results'], selected=modified_value)
+            for game_data in games_data['results']:
+                game_info = {
+                    'name': game_data.get('name', None),
+                    'rating': game_data.get('rating', None),
+                    'background_image': game_data.get('background_image', None),
+                    'platforms': game_data.get('platforms', []),
+                    'metacritic': game_data.get('metacritic', None),
+                    'genres': game_data.get('genres', []),
+                    'stores': game_data.get('stores', []),
+                    'developers': game_data.get('developers', []),
+                }
+                all_games_info.append(game_info)  # Append each game_info dictionary to the list
+            #session['all_games_info'] = all_games_info  # Store all_games_info in the session
+            #COOKIE TOO BIGGGG
+            all_games_info_json = json.dumps(all_games_info)
 
-    return render_template('developers.html', developer_dictionary=developer_dictionary)
+            cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            #cursor.execute('SELECT develolped_dict FROM user WHERE email = %s', (session['email'],))
+            #user = cursor.fetchone()
+            cursor.execute('UPDATE user SET developed_dict = %s WHERE email = %s', (all_games_info_json, session['email']))
+            mysql.connection.commit()
+
+            print("ALL GAMES INFO:", all_games_info)  # Print the list of all games' information
+            print(type(all_games_info))
+            return render_template('games.html', games=all_games_info, selected=modified_value, message= message,  logged_in=logged_in)
+
+    return render_template('developers.html', developer_dictionary=developer_dictionary, message= message, logged_in=logged_in)
 
 @app.route('/get_games', methods=['POST'])
 def get_games():
+    if 'loggedin' in session and session['loggedin']:
+        message = f'Hello, {session["name"]}!'
+    logged_in = 'loggedin' in session
     developer = request.form['developer']
     api_key = '33b676f49ef74f21860f648158668b42'
     url = f'https://api.rawg.io/api/games?key={api_key}&developers={developer}&ordering=-rating&page_size=10'
@@ -378,11 +575,16 @@ def get_games():
     response = requests.get(url)
     games_data = response.json()
 
-    return render_template('games.html', games=games_data['results'])
+    return render_template('games.html', games=games_data['results'], logged_in=logged_in, message = message)
 import ast
 @app.route('/favorites', endpoint='favorites', methods=['GET', 'POST'])
 def show_favorites():
+    current_route = request.path
     if 'loggedin' in session and session['loggedin']:
+        message = f'Hello, {session["name"]}!'
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute('UPDATE user SET developed_dict = %s WHERE email = %s', ('{}', session['email']))
+        mysql.connection.commit()        
         # Check if game_info session is present
         if 'game_info' not in session:
             # Fetch the game information from the 'favorite_games' column in the database
@@ -488,10 +690,10 @@ def show_favorites():
                     if game_name not in filtered_favorite_games:
                         del game_info_genre[game_name]
 
-            return render_template('favorites.html', favorites=filtered_favorite_games, game_info=session.get('game_info', {}))
+            return render_template('favorites.html', favorites=filtered_favorite_games, game_info=session.get('game_info', {}), current_route = current_route, message=message)
         else:
             # If there is no search query, show all favorite games
-            return render_template('favorites.html', favorites=favorite_games_dict, game_info=session.get('game_info', {}))
+            return render_template('favorites.html', favorites=favorite_games_dict, game_info=session.get('game_info', {}), current_route = current_route, message=message)
         # Convert the favorite_games_dict to a JSON string
         favorite_games_json = json.dumps(favorite_games_dict)
 
