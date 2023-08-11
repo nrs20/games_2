@@ -212,6 +212,7 @@ def fetch_game_info(game_slug):
         return None, [], None, [], None, None
 
 def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
+    game_info = {}
     # Implement your recommendation logic based on user input
     recommended_games = [
         game for game in games
@@ -281,10 +282,10 @@ def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
     print("-----------------------")
 
     # Store the shuffled recommended games and the updated game_info for the current genre in the session
-    session["recommended_games"] = new_recommended_games
-    session["game_info"] = game_info
+    #session["recommended_games"] = new_recommended_games
+    #session["game_info"] = game_info
     session["favorites_list"] = favorites_list
-    
+    return new_recommended_games, game_info   
 def search_games(games):
     search_results = []
     
@@ -334,13 +335,15 @@ def recommend_games():
     genre = request.form.get("genre")
     platform = request.form.get("platform")
     user_score_threshold = float(request.form.get("user_score"))
-
+    session["game_info"] = {}
+    print("THIS IS THE GAME SESSION IN RECOMMEND", session["game_info"])
     # Fetch and store the recommended games in the session
-    fetch_and_store_recommended_games(genre, platform, user_score_threshold)
+    recommended_games, game_info  = fetch_and_store_recommended_games(genre, platform, user_score_threshold)
     game_info = session.get("game_info", {})
     print("GAME INGO IN RECOMMEND", game_info)
     #print("THIS IS GAMES", games)
-    return render_template("recommendations.html", games=session["recommended_games"], game_info=game_info, message= message, logged_in=logged_in)
+    return render_template("recommendations.html", games=recommended_games, game_info=game_info, message=message, logged_in=logged_in)
+    #return render_template("recommendations.html", games=session["recommended_games"], game_info=game_info, message= message, logged_in=logged_in)
 
 # Route to handle the regenerate button click
 @app.route("/regenerate", methods=["POST"])
