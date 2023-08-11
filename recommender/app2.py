@@ -137,7 +137,7 @@ def index():
     current_route = request.path
     # Display welcome message if user is logged in
     if 'loggedin' in session:
-        message = f'Welcome, {session["name"]}!'
+        message = f'Happy gaming, {session["name"]}!'
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cursor.execute('UPDATE user SET developed_dict = %s WHERE email = %s', ('{}', session['email']))
         mysql.connection.commit() 
@@ -237,6 +237,11 @@ def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
         title = game['Name']
         game_slug = title.lower().replace(" ", "-")  # Format the title to create the API request URL
         #game_info[genre][title] = fetch_game_info(game_slug)
+        deal_info = search_games([game])
+        if deal_info:  # Check if there is deal information available
+            game["deal_link"] = deal_info[0].get("deal_link")
+            print(deal_info[0].get("cheapest"))
+            game["price"]= deal_info[0].get("cheapest")
         reddit_url, developer_names, meta, stores, photo, website = fetch_game_info(game_slug)
         game_info[genre][title] = {
             "reddit_url": reddit_url,
@@ -279,8 +284,48 @@ def fetch_and_store_recommended_games(genre, platform, user_score_threshold):
     session["recommended_games"] = new_recommended_games
     session["game_info"] = game_info
     session["favorites_list"] = favorites_list
+    
+def search_games(games):
+    search_results = []
+    
+    for game in games:
+        game_title = game["Name"]  # Use the game title to search for deals
+        # Construct the API URL using the entered game title
+        api_url = f"https://www.cheapshark.com/api/1.0/games?title={game_title}"
+        
+        # Fetch the API response
+        response = requests.get(api_url)
+        results = response.json()
+        
+        if results:  # Check if results are not empty
+            result = results[0]  # Get the first result
+            deal_id = result.get("cheapestDealID")
+            #cheapest = result.get("cheapest")
+            result["deal_link"] = f"https://www.cheapshark.com/redirect?dealID={deal_id}"
+            #result["cheapest"] = cheapest     
+            search_results.append(result)  # Append the result to the search_results list
+    print("SEARCH RESULTS")
+    print(search_results)
+    return search_results
+@app.route('/search_game', methods=['GET'])
+def search_game():
+    game_title = request.args.get('game_title')
 
-
+    if game_title:
+        # Construct the API URL using the entered game title
+        api_url = f"https://www.cheapshark.com/api/1.0/games?title={game_title}"
+        
+        # Fetch the API response
+        response = requests.get(api_url)
+        search_results = response.json()
+        
+        for result in search_results:
+            deal_id = result.get('cheapestDealID')
+            result['deal_link'] = f"https://www.cheapshark.com/redirect?dealID={deal_id}"
+        
+        return render_template('search_game.html', search_results=search_results)
+    
+    return render_template('search_game.html')
 # Route to handle the initial recommendation request
 @app.route("/recommend", methods=["POST"])
 def recommend_games():
