@@ -103,6 +103,11 @@
                         {% endif %}
 
             <br>
+            {% if game.price and game.deal_link %}
+            <p> Cheapest Price:  {{game.price}} USD - <a href="{{ game.deal_link }}" target="_blank">View Deal</a> </p>
+            <br>
+            {% endif %}
+
             Genre: {{ game.Genre|join(", ") }}, User Score: {{ game.User_Score }}, Platform: {{ game.Platform|replace("[", "")|replace("]", "")|replace("'", " ") }}
             <p>{{ game_info[game.Genre|join(", ")][game.Name][0] }}</p>
 

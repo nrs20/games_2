@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Profile</title>
+</head>
+<body>
+    <h1>Welcome to Your Profile</h1>
+    
+    <h2>Bookmarked Games</h2>
+    <ul>
+        {% for game_info in bookmarked_games %}
+        <li>
+            <h3>{{ game_info.name }}</h3>
+            <img src="{{ game_info.background_image }}" alt="Game Image">
+            <p>Rating: {{ game_info.rating }}</p>
+            <!-- Display other relevant game information -->
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

@@ -3,6 +3,7 @@
 <head>
     <title>Game Recommender</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
+
     <link rel="icon" type="image/x-icon" href="static/favicon.jpeg"/>
     <style>
         .navbar {
@@ -29,6 +30,78 @@
             background-color: #555;
             color: white;
         }
+        /* Styles for the welcome popup */
+        /* Styles for the welcome popup */
+        .popup {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .popup-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            text-align: center;
+            margin: auto; /* Center horizontally */
+        }
+        
+        .popup-close {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        
+        .loading-spinner {
+            display: none; /* Hide the spinner by default */
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(0, 0, 0, 0.2);
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 2s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        } 
+        .loader {
+            display: none;
+            top: 50%;
+            left: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+          }
+          
+          .loading {
+            border: 2px solid #ccc;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border-top-color: #1ecd97;
+            border-left-color: #1ecd97;
+            animation: spin 1s infinite ease-in;
+          }
+          
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+          
+            100% {
+              transform: rotate(360deg);
+            }
+          }
     </style>
 </head>
 <body>
@@ -37,20 +110,37 @@
         <a href="/favorites" {% if current_route == '/favorites' %}class="active"{% endif %}>My Favorites</a>
         <a href="/developers" {% if current_route == '/developers' %}class="active"{% endif %}>Developer</a>
         <a href="/bookmarked_games" {% if current_route == '/bookmarked_games' %}class="active"{% endif %}> Bookmarked Games</a>
+        <a href="{{ url_for('search_game') }}">Search Deals</a>
+
         {% if message %}
         <a href="{{ url_for('logout') }}">Logout</a>
       {% else %}
       <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('register') }}">Register</a>
+
       {% endif %}
     </div>
         
     <h1>Game Recommender</h1> 
     <br>
-  
-    <iframe src="https://giphy.com/embed/S5uMJDmtnATLbjjw3h" width="432" height="480" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/S5uMJDmtnATLbjjw3h">via GIPHY</a></p>    {% if 'loggedin' in session %}
+    <div id="welcome-popup" class="popup">
+        <div class="popup-content">
+            <button onclick="closePopup()" class="popup-close">Close </button>
+
+            <h2>Welcome!</h2>
+            <p>My name is Natalia, nice to meet you!</p>
+            <p>I've been gaming for over 10 years, and I always love discovering new games. This website uses the RAWG API to fetch games that meet your genre, platform, and user score requirements. </p>
+                <p>You can also head over to the developers tab to search for the top games by a specified developer. </p>
+                    <p>Lastly, if you create an account, you can favorite/bookmark any game you are interested in. </p>
+                <p> Happy gaming!</p>
+        </div>
+    </div>
+    
+
+     <iframe src="https://giphy.com/embed/S5uMJDmtnATLbjjw3h" width="432" height="480" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/S5uMJDmtnATLbjjw3h">via GIPHY</a></p>    {% if 'loggedin' in session %}
     {% if message %}
 
-    <p>{{ message }}</p>  
+    <h2>{{ message }}</h2>  
 
     {% endif %}
    
@@ -97,13 +187,69 @@
         <label for="user_score">User Score Threshold:</label>
         <input type="number" name="user_score" id="user_score" min="0" max="10" step="0.1" placeholder="Enter the minimum user score" required>
         <br>
-
+        
+        <div id="loading-wheel" style="display: none;">
+            <img src="static\loading.gif" alt="Loading..." width="50" height="50">
+        </div>
         <!-- Hidden input field for selected platform -->
         <input type="hidden" name="selected_platform" id="selected_platform" value="">
 
-        <button type="submit">Recommend</button>
+        <button type="submit" class="sbtn btn btn-secondary btn-c" onclick="spinner()">Recommend</button>   
+        <div class="loader">
+            <div class="loading">
+            </div>
+          </div> 
     </form>
-
     <!-- Your other HTML content -->
+    <script>
+        // JavaScript code here
+        function closePopup() {
+            var popup = document.getElementById('welcome-popup');
+            popup.style.display = 'none';
+        }
+       // document.cookie = 'visited=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+        // Check if the cookie exists
+        if (!document.cookie.includes('visited=true')) {
+            // Display the popup if the cookie doesn't exist
+            var popup = document.getElementById('welcome-popup');
+            popup.style.display = 'block';
+    
+            // Set a cookie to track that the user has visited the site
+            document.cookie = 'visited=true; max-age=86400'; // Cookie expires after 1 day (86400 seconds)
+        }
+        else{
+            console.log("COOKIE SET");
+        }
+        /*
+        document.addEventListener("DOMContentLoaded", function() {
+            const recommendButton = document.getElementById("recommend-button");
+            const loadingSpinner = document.getElementById("loading-spinner");
+        
+            recommendButton.addEventListener("click", function() {
+                // Show the loading spinner
+                loadingSpinner.style.display = "block";
+        
+                // Optionally, disable the "Recommend" button to prevent multiple clicks
+                recommendButton.disabled = true;
+            });
+        });
+        */
+        function showLoading() {
+            var loadingWheel = document.getElementById('loading-wheel');
+            var form = document.querySelector('form');
+    
+            loadingWheel.style.display = 'block';
+            form.style.display = 'none';
+        }
+        function spinner() {
+            document.getElementsByClassName("loader")[0].style.display = "block";
+        }
+    </script>
 </body>
+<br>
+<br>
+<footer>
+    Made by Natalia Smith. Thank you to RAWG's API!
+</footer>
 </html>

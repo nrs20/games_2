@@ -42,6 +42,8 @@
         <a href="/favorites" {% if current_route == '/favorites' %}class="active"{% endif %}>My Favorites</a>
         <a href="/developers" {% if current_route == '/developers' %}class="active"{% endif %}>Developer</a>
         <a href="/bookmarked_games" {% if current_route == '/bookmarked_games' %}class="active"{% endif %}> Bookmarked Games</a>
+        <a href="{{ url_for('search_game') }}">Search Deals</a>
+
         {% if message %}
         <a href="{{ url_for('logout') }}">Logout</a>
         {% else %}
