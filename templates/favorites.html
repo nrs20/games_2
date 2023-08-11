@@ -2,15 +2,55 @@
 <html>
 <head>
     <title>My Favorites</title>
-    <link rel="icon" type="image/x-icon" href="images\favicon.ico">
+    <link rel="icon" type="image/x-icon" href="static/favicon.jpeg">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/98mprice/PSone.css@master/PSone.min.css">
+    <style>
+        .navbar {
+            background-color: #333;
+            overflow: hidden;
+        }
+
+        .navbar a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+        }
+
+        .navbar a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+        .favorite-game-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .favorite-game {
+            width: calc(50% - 10px);
+            margin-bottom: 20px;
+            /* Other styles for individual game elements */
+        }
+    </style>
 </head>
-
 <body>
-    <a href="{{ url_for('index') }}">Home</a>
+    <div class="navbar">
+        <a href="/" {% if current_route == '/' %}class="active"{% endif %}>Home</a>
+        <a href="/favorites" {% if current_route == '/favorites' %}class="active"{% endif %}>My Favorites</a>
+        <a href="/developers" {% if current_route == '/developers' %}class="active"{% endif %}>Developer</a>
+        <a href="/bookmarked_games" {% if current_route == '/bookmarked_games' %}class="active"{% endif %}> Bookmarked Games</a>
+        {% if message %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+        {% endif %}
+    </div>
+       <h1>My Favorites</h1>
+ <h2><a href="{{ url_for('favorites') }}" class="btn btn-primary">Show All Favorite Games</a></h2>
 
-    <h1>My Favorites</h1>
-    <a href="{{ url_for('favorites') }}" class="btn btn-primary">Show All Favorite Games</a>
 
     <form method="get">
         <input type="text" name="search" placeholder="Search for a game">
@@ -58,8 +98,9 @@
 
     {% if favorites %}
 
-    <div id="favorites-container">
+    <div id="favorites-container" class="favorite-game-container">
         {% for game_name, game in favorites.items() %}
+        
             <div class="favorite-game">
                 <h3><a href="https://www.google.com/search?q={{ game['Name'] }}" target="_blank">{{ game['Name'] }}</a></h3>
                 {% if game['photo']%}
@@ -95,8 +136,8 @@
         Website URL not available.
         {% endif %}
         <br>
-
-        {% if game.Genre|join(", ") in game_info and game_info[game.Genre|join(", ")][game.Name]["stores"] %}
+<!--
+        {% if game['Genre']|join(", ") in game_info and game['Name'] in game_info[game['Genre']|join(", ")]['stores'] %}
         <p class="game-stores">
             Stores:
             <ul>
@@ -112,7 +153,21 @@
     {% else %}
         Stores Not Found.
     {% endif %}
-
+-->
+{% if game.Genre|join(", ") in game_info and game_info[game.Genre|join(", ")][game.Name]["stores"] %}
+<p class="game-stores">
+    Stores:
+        {% for store in game_info[game.Genre|join(", ")][game.Name]["stores"] %}
+            {% if store.domain %}
+            <li><a href="https://{{ store.domain }}" target="_blank" data-store="{{ store.name }}">{{ store.name }}</a></li>
+            {% else %}
+                <li>No store information available</li>
+            {% endif %}
+        {% endfor %}
+</p>
+{% else %}
+Stores Not Found.
+{% endif %}
 
             {% if 'metacritic' in game %}
                 {% if game['metacritic'] != 'No Metacritic URL available.' %}
