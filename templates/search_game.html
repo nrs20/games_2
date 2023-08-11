@@ -34,8 +34,9 @@
             margin-bottom: 20px;
             /* Other styles for individual game elements */
         }
+       
     </style>
-    <title>Game Search</title>
+    <title>Nat's Game Recommender</title>
 </head>
 <body>
     <div class="navbar">
@@ -44,14 +45,22 @@
         <a href="/developers" {% if current_route == '/developers' %}class="active"{% endif %}>Developer</a>
         <a href="/bookmarked_games" {% if current_route == '/bookmarked_games' %}class="active"{% endif %}> Bookmarked Games</a>
         <a href="{{ url_for('search_game') }}">Search Deals</a>
+        {% if message %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+      <a href="{{ url_for('login') }}">Login</a>
+      <a href="{{ url_for('register') }}">Register</a>
 
+      {% endif %}
     </div>
     <h1>Game Search</h1>
+    <iframe src="https://giphy.com/embed/AuG7qwUzshT7lXy7FB" width="480" height="326" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/522Productions-522-productions-522productions-AuG7qwUzshT7lXy7FB">via GIPHY</a></p>
     <form method="get" action="/search_game">
         <label for="game_title">Enter Game Title:</label>
         <input type="text" name="game_title" id="game_title" required>
         <button type="submit">Search</button>
     </form>
+    
     
     <!-- Display the search results here -->
     {% if search_results is defined %}
@@ -62,7 +71,7 @@
                     <div class="recommended-game">
                         <li>
                             <h2>{{ result['external'] }}</h2>
-                            <img src="{{ result['thumb'] }}" alt="{{ result['external'] }}" width="400" height="300">
+                            <img src="{{ result['thumb'] }}" alt="{{ result['external'] }}" width="600" height="500">
                             <p>Cheapest Price: ${{ result['cheapest'] }}</p>
                             <a href="{{ result['deal_link'] }}" target="_blank">View Deal</a>
                         </li>
