@@ -41,10 +41,8 @@ pyparsing==3.0.9
 pyrsistent==0.19.3
 python-dateutil==2.8.2
 pytz==2023.3
-pywin32==306
-pyzmq==25.0.2
-rawg==1.2.0
-rawgpy==1.0.3
+
+
 requests==2.31.0
 
 SQLAlchemy==2.0.19
