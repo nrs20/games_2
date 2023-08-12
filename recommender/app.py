@@ -311,7 +311,8 @@ def search_games(games):
 @app.route('/search_game', methods=['GET'])
 def search_game():
     game_title = request.args.get('game_title')
-
+    logged_in = 'loggedin' in session
+    message = f'Hello, {session["name"]}!' if logged_in and 'name' in session else None
     if game_title:
         # Construct the API URL using the entered game title
         api_url = f"https://www.cheapshark.com/api/1.0/games?title={game_title}"
@@ -324,7 +325,7 @@ def search_game():
             deal_id = result.get('cheapestDealID')
             result['deal_link'] = f"https://www.cheapshark.com/redirect?dealID={deal_id}"
         
-        return render_template('search_game.html', search_results=search_results)
+        return render_template('search_game.html', search_results=search_results, message = message)
     
     return render_template('search_game.html')
 # Route to handle the initial recommendation request
@@ -443,7 +444,9 @@ def bookmark_game():
                     mysql.connection.commit()
                     
                     # Return an empty response (status code 200) to indicate success
-                    return '', 200
+# Redirect back to the developers page with a success query parameter
+                    return "Game successfully bookmarked!", 200
+                    #return redirect(url_for('developers', success_message="Game successfully bookmarked!"))
                 else:
                     # Return an empty response (status code 200) to indicate the game is already bookmarked
                     return '', 200
@@ -572,6 +575,7 @@ def developers():
     message = f'Hello, {session["name"]}!' if logged_in and 'name' in session else None
     
     selected_developer = request.args.get('selected_developer')
+    #success_message = request.args.get('success_message')
 
     if selected_developer:
         api_key = '33b676f49ef74f21860f648158668b42'
