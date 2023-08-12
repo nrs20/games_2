@@ -21,7 +21,7 @@ debugpy==1.6.7
 email-validator==2.0.0.post2
 executing==1.2.0
 fastjsonschema==2.16.3
-Flask==2.3.2
+Flask
 Flask-Bcrypt==1.0.1
 Flask-Login==0.6.2
 Flask-Migrate==4.0.4
